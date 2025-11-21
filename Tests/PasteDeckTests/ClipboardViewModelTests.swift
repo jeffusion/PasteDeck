@@ -14,18 +14,23 @@ import Combine
 final class ClipboardViewModelTests: XCTestCase {
     var viewModel: ClipboardViewModel!
     var monitor: ClipboardMonitor!
+    var storageService: StorageService!
     var cancellables: Set<AnyCancellable>!
 
     override func setUp() async throws {
         try await super.setUp()
         monitor = ClipboardMonitor()
-        viewModel = ClipboardViewModel(monitor: monitor, maxHistorySize: 10)
+        // Use in-memory storage for test isolation
+        let persistenceController = PersistenceController(inMemory: true)
+        storageService = StorageService(persistenceController: persistenceController)
+        viewModel = ClipboardViewModel(monitor: monitor, storageService: storageService, maxHistorySize: 10)
         cancellables = Set<AnyCancellable>()
     }
 
     override func tearDown() async throws {
         cancellables.removeAll()
         viewModel = nil
+        storageService = nil
         monitor.stopMonitoring()
         monitor = nil
         try await super.tearDown()

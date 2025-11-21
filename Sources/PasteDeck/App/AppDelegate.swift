@@ -9,6 +9,7 @@
 import Cocoa
 import SwiftUI
 import Combine
+import KeyboardShortcuts
 
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -18,6 +19,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var clipboardWindow: NSPanel!
     private var clipboardMonitor: ClipboardMonitor!
     private var clipboardViewModel: ClipboardViewModel!
+    private var hotKeyManager: HotKeyManager!
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Application Lifecycle
@@ -162,15 +164,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupKeyboardShortcuts() {
-        // TODO: Implement global keyboard shortcuts using KeyboardShortcuts package
-        // For now, users can use the menu bar to access the window
+        hotKeyManager = HotKeyManager()
 
-        // Example shortcut: Cmd+Shift+V
-        // KeyboardShortcuts.onKeyUp(for: .showClipboard) { [weak self] in
-        //     self?.toggleClipboardWindow()
-        // }
+        // Set up callbacks
+        hotKeyManager.onShowClipboard = { [weak self] in
+            self?.toggleClipboardWindow()
+        }
 
-        print("⌨️ Keyboard shortcuts setup (placeholder)")
+        hotKeyManager.onClearHistory = { [weak self] in
+            self?.clipboardViewModel.clearHistory()
+        }
+
+        hotKeyManager.onSearchClipboard = { [weak self] in
+            self?.showClipboardWindow()
+            // Focus search field after window appears
+        }
+
+        // Check accessibility permission
+        if !hotKeyManager.hasAccessibilityPermission {
+            hotKeyManager.requestAccessibilityPermission()
+        }
+
+        print("⌨️ Keyboard shortcuts setup completed")
     }
 
     // MARK: - Actions

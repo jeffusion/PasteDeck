@@ -212,7 +212,7 @@ extension ClipItemEntity {
 extension ClipItemEntity {
     /// Create a new entity from a ClipItem
     static func create(from item: ClipItem, in context: NSManagedObjectContext) -> ClipItemEntity {
-        let entity = ClipItemEntity(context: context)
+        let entity = NSEntityDescription.insertNewObject(forEntityName: "ClipItemEntity", into: context) as! ClipItemEntity
         entity.update(from: item)
         return entity
     }
