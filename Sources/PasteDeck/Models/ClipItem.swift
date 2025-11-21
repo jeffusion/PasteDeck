@@ -10,7 +10,7 @@ import Foundation
 import CloudKit
 
 /// Represents a single clipboard item with metadata
-struct ClipItem: Identifiable, Codable, Equatable {
+struct ClipItem: Identifiable, Codable, Equatable, Hashable {
     // MARK: - Properties
 
     /// Unique identifier
@@ -160,6 +160,12 @@ struct ClipItem: Identifiable, Codable, Equatable {
 
     static func == (lhs: ClipItem, rhs: ClipItem) -> Bool {
         return lhs.id == rhs.id
+    }
+
+    // MARK: - Hashable
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }
 
