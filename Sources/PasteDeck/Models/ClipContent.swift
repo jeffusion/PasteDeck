@@ -158,6 +158,14 @@ enum ClipContent: Codable, Equatable {
         }
     }
 
+    /// Whether this content is an image
+    var isImage: Bool {
+        if case .image = self {
+            return true
+        }
+        return false
+    }
+
     // MARK: - Codable Implementation
 
     enum CodingKeys: String, CodingKey {
