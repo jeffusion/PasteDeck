@@ -10,6 +10,7 @@ import Cocoa
 import SwiftUI
 import Combine
 
+@MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Properties
 
