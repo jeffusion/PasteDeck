@@ -25,6 +25,7 @@ class ClipboardViewModel: ObservableObject {
     // MARK: - Private Properties
 
     private let monitor: ClipboardMonitor
+    private let storageService: StorageService
     private var cancellables = Set<AnyCancellable>()
     private let maxHistorySize: Int
 
@@ -34,8 +35,9 @@ class ClipboardViewModel: ObservableObject {
 
     // MARK: - Initialization
 
-    init(monitor: ClipboardMonitor, maxHistorySize: Int? = nil) {
+    init(monitor: ClipboardMonitor, storageService: StorageService = StorageService(), maxHistorySize: Int? = nil) {
         self.monitor = monitor
+        self.storageService = storageService
         self.maxHistorySize = maxHistorySize ?? defaultMaxHistorySize
 
         setupSubscriptions()
@@ -70,10 +72,10 @@ class ClipboardViewModel: ObservableObject {
     }
 
     private func loadInitialData() {
-        // TODO: Load persisted data from Core Data
-        // For now, start with empty list
-        items = []
-        filteredItems = []
+        // Load persisted data from Core Data
+        items = storageService.fetchAll()
+        applyFilters()
+        print("📋 ClipboardViewModel: Loaded \(items.count) items from storage")
     }
 
     // MARK: - Public Methods
@@ -236,8 +238,13 @@ class ClipboardViewModel: ObservableObject {
     }
 
     private func saveItems() {
-        // TODO: Persist to Core Data
-        // For now, just keep in memory
+        // Persist all items to Core Data
+        // First, clear and re-save (simple approach for now)
+        _ = storageService.deleteAll(keepFavorites: false)
+        _ = storageService.save(items)
+
+        // Enforce max history
+        _ = storageService.enforceMaxHistory(maxItems: maxHistorySize)
     }
 
     private func simulatePaste() {

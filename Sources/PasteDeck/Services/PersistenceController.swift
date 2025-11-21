@@ -72,7 +72,10 @@ class PersistenceController {
         container = NSPersistentContainer(name: "PasteDeck", managedObjectModel: model)
 
         if inMemory {
-            container.persistentStoreDescriptions.first?.url = URL(fileURLWithPath: "/dev/null")
+            // Use proper in-memory store type
+            let description = NSPersistentStoreDescription()
+            description.type = NSInMemoryStoreType
+            container.persistentStoreDescriptions = [description]
         } else {
             // Set up store URL in Application Support
             let storeURL = Self.storeURL()
