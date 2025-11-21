@@ -164,20 +164,22 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ## Roadmap
 
-### Phase 1 (Current) - MVP
+### Phase 1 - MVP ✅
 - [x] Project setup and architecture
-- [ ] Clipboard monitoring
-- [ ] Core Data setup
-- [ ] Basic UI (list view)
-- [ ] Global hotkey
-- [ ] Search functionality
+- [x] Clipboard monitoring
+- [x] Core Data setup
+- [x] Basic UI (list view)
+- [x] Global hotkey
+- [x] Search functionality
 
-### Phase 2 - Core Features
-- [ ] Image and file support
-- [ ] Favorites and pins
-- [ ] Menu bar integration
-- [ ] Settings panel
-- [ ] App exclusion list
+### Phase 2 - Core Features ✅
+- [x] Image and file preview UI
+- [x] Favorites and pins
+- [x] Menu bar integration
+- [x] Settings panel
+- [x] App exclusion list
+- [x] Keyboard navigation in list
+- [x] Copy and paste workflow
 
 ### Phase 3 - iCloud Sync
 - [ ] CloudKit integration
