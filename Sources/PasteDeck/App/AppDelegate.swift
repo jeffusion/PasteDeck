@@ -21,6 +21,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var clipboardViewModel: ClipboardViewModel!
     private var hotKeyManager: HotKeyManager!
     private var cancellables = Set<AnyCancellable>()
+    private var isShowingWindow = false
 
     // MARK: - Application Lifecycle
 
@@ -132,35 +133,44 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Create hosting controller
         let hostingController = NSHostingController(rootView: contentView)
 
-        // Calculate window size and position (centered on screen)
-        let windowSize = CGSize(width: 600, height: 500)
+        // Calculate drawer size and position (bottom of screen)
         let screenFrame = NSScreen.main?.visibleFrame ?? .zero
+        let drawerHeight: CGFloat = 220
+        let windowSize = CGSize(width: screenFrame.width, height: drawerHeight)
+
+        // Start off-screen (below visible area) for animation
         let windowOrigin = CGPoint(
-            x: screenFrame.midX - windowSize.width / 2,
-            y: screenFrame.midY - windowSize.height / 2
+            x: screenFrame.origin.x,
+            y: screenFrame.origin.y - drawerHeight
         )
         let windowRect = CGRect(origin: windowOrigin, size: windowSize)
 
-        // Create panel (special kind of window)
+        // Create panel with borderless style for drawer appearance
         clipboardWindow = NSPanel(
             contentRect: windowRect,
-            styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
+            styleMask: [.borderless, .fullSizeContentView, .utilityWindow],
             backing: .buffered,
             defer: false
         )
 
-        // Configure panel
-        clipboardWindow.title = "PasteDeck"
+        // Configure panel for drawer behavior
         clipboardWindow.contentView = hostingController.view
         clipboardWindow.isFloatingPanel = true
-        clipboardWindow.level = .floating
+        clipboardWindow.level = .popUpMenu
         clipboardWindow.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        clipboardWindow.titlebarAppearsTransparent = true
-        clipboardWindow.isMovableByWindowBackground = true
-        clipboardWindow.styleMask.insert(.fullSizeContentView)
+        clipboardWindow.backgroundColor = NSColor(white: 0.15, alpha: 0.98)
+        clipboardWindow.isOpaque = false
+        clipboardWindow.hasShadow = true
+        clipboardWindow.hidesOnDeactivate = false
+        clipboardWindow.becomesKeyOnlyIfNeeded = false
 
         // Handle window close
         clipboardWindow.delegate = self
+
+        // Set up close callback for ViewModel
+        clipboardViewModel.onRequestClose = { [weak self] in
+            self?.hideClipboardWindow()
+        }
     }
 
     private func setupKeyboardShortcuts() {
@@ -204,18 +214,81 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func showClipboardWindow() {
-        if clipboardWindow.isVisible {
-            clipboardWindow.orderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-        } else {
+        guard !clipboardWindow.isVisible else {
             clipboardWindow.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
+            return
         }
+
+        isShowingWindow = true
+
+        // Use full screen frame for width, visibleFrame for height calculation
+        let fullFrame = NSScreen.main?.frame ?? .zero
+        let visibleFrame = NSScreen.main?.visibleFrame ?? .zero
+        let drawerHeight: CGFloat = 220
+
+        // Update window size to match full screen width
+        let windowSize = CGSize(width: fullFrame.width, height: drawerHeight)
+        clipboardWindow.setContentSize(windowSize)
+
+        // Position window off-screen first (below visible area)
+        clipboardWindow.setFrameOrigin(CGPoint(
+            x: fullFrame.origin.x,
+            y: visibleFrame.origin.y - drawerHeight
+        ))
+
+        // Show window and activate
+        clipboardWindow.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+
+        // Animate slide up
+        let targetFrame = CGRect(
+            x: fullFrame.origin.x,
+            y: visibleFrame.origin.y,
+            width: fullFrame.width,
+            height: drawerHeight
+        )
+
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.25
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            context.allowsImplicitAnimation = true
+
+            self.clipboardWindow.setFrame(targetFrame, display: true, animate: true)
+        }, completionHandler: { [weak self] in
+            self?.isShowingWindow = false
+        })
+    }
+
+    private func hideClipboardWindow() {
+        guard clipboardWindow.isVisible else { return }
+
+        let fullFrame = NSScreen.main?.frame ?? .zero
+        let visibleFrame = NSScreen.main?.visibleFrame ?? .zero
+        let drawerHeight: CGFloat = 220
+
+        // Animate slide down
+        let targetFrame = CGRect(
+            x: fullFrame.origin.x,
+            y: visibleFrame.origin.y - drawerHeight,
+            width: fullFrame.width,
+            height: drawerHeight
+        )
+
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.2
+            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            context.allowsImplicitAnimation = true
+
+            self.clipboardWindow.setFrame(targetFrame, display: true, animate: true)
+        }, completionHandler: { [weak self] in
+            self?.clipboardWindow.orderOut(nil)
+        })
     }
 
     @objc private func toggleClipboardWindow() {
         if clipboardWindow.isVisible {
-            clipboardWindow.orderOut(nil)
+            hideClipboardWindow()
         } else {
             showClipboardWindow()
         }
@@ -247,13 +320,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
 extension AppDelegate: NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
-        // Just hide the window instead of terminating the app
-        clipboardWindow.orderOut(nil)
+        // Hide the drawer with animation instead of terminating
+        hideClipboardWindow()
     }
 
     func windowDidResignKey(_ notification: Notification) {
-        // Optionally hide window when it loses focus
-        // Uncomment if you want auto-hide behavior
-        // clipboardWindow.orderOut(nil)
+        // Don't auto-hide if we're in the middle of showing the window
+        guard !isShowingWindow else { return }
+        // Auto-hide drawer when it loses focus
+        hideClipboardWindow()
     }
 }

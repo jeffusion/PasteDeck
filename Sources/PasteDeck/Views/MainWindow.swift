@@ -15,19 +15,18 @@ struct MainWindow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header with search and filters
-            HeaderView(isSearchFocused: $isSearchFocused)
+            // Compact header with search
+            DrawerHeaderView(isSearchFocused: $isSearchFocused)
 
-            Divider()
-
-            // Main content
+            // Main content - horizontal card grid
             if viewModel.filteredItems.isEmpty {
-                EmptyStateView()
+                DrawerEmptyStateView()
             } else {
-                ClipListView(selectedItem: $selectedItem)
+                CardGridView(selectedItem: $selectedItem)
             }
         }
-        .frame(minWidth: 500, minHeight: 400)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .windowBackgroundColor).opacity(0.95))
         .onAppear {
             // Select first item by default
             if selectedItem == nil && !viewModel.filteredItems.isEmpty {
@@ -42,15 +41,11 @@ struct MainWindow: View {
         }
         .background(
             KeyboardEventHandler(
-                onUpArrow: { moveSelection(by: -1) },
-                onDownArrow: { moveSelection(by: 1) },
+                onLeftArrow: { moveSelection(by: -1) },
+                onRightArrow: { moveSelection(by: 1) },
                 onReturn: {
                     guard let item = selectedItem else { return }
-                    if NSEvent.modifierFlags.contains(.command) {
-                        viewModel.copyAndPaste(item)
-                    } else {
-                        viewModel.copyItem(item)
-                    }
+                    viewModel.copyAndPaste(item)
                 },
                 onDelete: {
                     if let item = selectedItem {
@@ -58,7 +53,7 @@ struct MainWindow: View {
                     }
                 },
                 onEscape: {
-                    NSApp.keyWindow?.close()
+                    viewModel.onRequestClose?()
                 }
             )
         )
@@ -80,16 +75,16 @@ struct MainWindow: View {
 // MARK: - Keyboard Event Handler
 
 struct KeyboardEventHandler: NSViewRepresentable {
-    var onUpArrow: () -> Void
-    var onDownArrow: () -> Void
+    var onLeftArrow: () -> Void
+    var onRightArrow: () -> Void
     var onReturn: () -> Void
     var onDelete: () -> Void
     var onEscape: () -> Void
 
     func makeNSView(context: Context) -> KeyboardView {
         let view = KeyboardView()
-        view.onUpArrow = onUpArrow
-        view.onDownArrow = onDownArrow
+        view.onLeftArrow = onLeftArrow
+        view.onRightArrow = onRightArrow
         view.onReturn = onReturn
         view.onDelete = onDelete
         view.onEscape = onEscape
@@ -97,16 +92,16 @@ struct KeyboardEventHandler: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: KeyboardView, context: Context) {
-        nsView.onUpArrow = onUpArrow
-        nsView.onDownArrow = onDownArrow
+        nsView.onLeftArrow = onLeftArrow
+        nsView.onRightArrow = onRightArrow
         nsView.onReturn = onReturn
         nsView.onDelete = onDelete
         nsView.onEscape = onEscape
     }
 
     class KeyboardView: NSView {
-        var onUpArrow: (() -> Void)?
-        var onDownArrow: (() -> Void)?
+        var onLeftArrow: (() -> Void)?
+        var onRightArrow: (() -> Void)?
         var onReturn: (() -> Void)?
         var onDelete: (() -> Void)?
         var onEscape: (() -> Void)?
@@ -115,10 +110,10 @@ struct KeyboardEventHandler: NSViewRepresentable {
 
         override func keyDown(with event: NSEvent) {
             switch event.keyCode {
-            case 126: // Up arrow
-                onUpArrow?()
-            case 125: // Down arrow
-                onDownArrow?()
+            case 123: // Left arrow
+                onLeftArrow?()
+            case 124: // Right arrow
+                onRightArrow?()
             case 36: // Return
                 onReturn?()
             case 51: // Delete
@@ -132,86 +127,85 @@ struct KeyboardEventHandler: NSViewRepresentable {
     }
 }
 
-// MARK: - Header View
+// MARK: - Drawer Header View
 
-struct HeaderView: View {
+struct DrawerHeaderView: View {
     @EnvironmentObject var viewModel: ClipboardViewModel
     var isSearchFocused: FocusState<Bool>.Binding
 
     var body: some View {
-        VStack(spacing: 12) {
+        HStack(spacing: 12) {
             // Search bar
-            HStack {
+            HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
+                    .font(.caption)
                     .foregroundColor(.secondary)
 
-                TextField("Search clipboard...", text: $viewModel.searchText)
+                TextField("Search...", text: $viewModel.searchText)
                     .textFieldStyle(.plain)
+                    .font(.system(size: 12))
                     .focused(isSearchFocused)
 
                 if !viewModel.searchText.isEmpty {
                     Button(action: { viewModel.searchText = "" }) {
                         Image(systemName: "xmark.circle.fill")
+                            .font(.caption)
                             .foregroundColor(.secondary)
                     }
                     .buttonStyle(.plain)
                 }
             }
-            .padding(8)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
             .background(Color(nsColor: .controlBackgroundColor))
-            .cornerRadius(8)
+            .cornerRadius(6)
+            .frame(maxWidth: 200)
 
-            // Filters
-            HStack {
-                // Content type filter
-                Picker("Type", selection: $viewModel.contentFilter) {
-                    ForEach(ClipItem.ContentFilter.allCases, id: \.self) { filter in
-                        Label(filter.rawValue, systemImage: filter.iconName)
-                            .tag(filter)
-                    }
+            // Content type filter (compact)
+            Picker("", selection: $viewModel.contentFilter) {
+                ForEach(ClipItem.ContentFilter.allCases, id: \.self) { filter in
+                    Image(systemName: filter.iconName)
+                        .tag(filter)
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-
-                Spacer()
-
-                // Date filter
-                Menu {
-                    ForEach(ClipItem.DateFilter.allCases, id: \.self) { filter in
-                        Button(filter.rawValue) {
-                            viewModel.dateFilter = filter
-                        }
-                    }
-                } label: {
-                    Label(viewModel.dateFilter.rawValue, systemImage: "calendar")
-                }
-                .menuStyle(.borderlessButton)
-                .frame(width: 120)
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(maxWidth: 180)
+
+            Spacer()
+
+            // Item count
+            Text("\(viewModel.filteredItems.count) items")
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
-        .padding()
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Color(nsColor: .windowBackgroundColor).opacity(0.9))
     }
 }
 
-// MARK: - Empty State View
+// MARK: - Drawer Empty State View
 
-struct EmptyStateView: View {
+struct DrawerEmptyStateView: View {
     @EnvironmentObject var viewModel: ClipboardViewModel
 
     var body: some View {
-        VStack(spacing: 16) {
+        HStack(spacing: 12) {
             Image(systemName: viewModel.isSearching ? "magnifyingglass" : "doc.on.clipboard")
-                .font(.system(size: 48))
+                .font(.system(size: 24))
                 .foregroundColor(.secondary)
 
-            Text(viewModel.isSearching ? "No results found" : "No clipboard history")
-                .font(.title2)
-                .fontWeight(.medium)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(viewModel.isSearching ? "No results found" : "No clipboard history")
+                    .font(.headline)
 
-            Text(viewModel.isSearching ?
-                 "Try a different search term" :
-                 "Copy something to get started")
-                .foregroundColor(.secondary)
+                Text(viewModel.isSearching ?
+                     "Try a different search term" :
+                     "Copy something to get started")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -224,7 +218,7 @@ struct MainWindow_Previews: PreviewProvider {
     static var previews: some View {
         MainWindow()
             .environmentObject(ClipboardViewModel.preview)
-            .frame(width: 600, height: 500)
+            .frame(width: 800, height: 220)
     }
 }
 #endif
