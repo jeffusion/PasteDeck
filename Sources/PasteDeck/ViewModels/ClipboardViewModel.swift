@@ -22,6 +22,11 @@ class ClipboardViewModel: ObservableObject {
     @Published var dateFilter: ClipItem.DateFilter = .all
     @Published var isSearching: Bool = false
 
+    // MARK: - Callbacks
+
+    /// Called when the view should be closed (e.g., after paste)
+    var onRequestClose: (() -> Void)?
+
     // MARK: - Private Properties
 
     private let monitor: ClipboardMonitor
@@ -98,8 +103,11 @@ class ClipboardViewModel: ObservableObject {
     func copyAndPaste(_ item: ClipItem) {
         copyItem(item)
 
-        // Simulate Cmd+V after a short delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        // Close the drawer first to return focus to previous app
+        onRequestClose?()
+
+        // Simulate Cmd+V after drawer closes
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             self.simulatePaste()
         }
     }
