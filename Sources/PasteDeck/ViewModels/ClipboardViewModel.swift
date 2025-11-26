@@ -27,6 +27,9 @@ class ClipboardViewModel: ObservableObject {
     /// Called when the view should be closed (e.g., after paste)
     var onRequestClose: (() -> Void)?
 
+    /// Called immediately before paste to lower window level (allows instant paste)
+    var onPrepareForPaste: (() -> Void)?
+
     // MARK: - Private Properties
 
     private let monitor: ClipboardMonitor
@@ -70,6 +73,8 @@ class ClipboardViewModel: ObservableObject {
 
         // Subscribe to filter changes
         Publishers.CombineLatest($contentFilter, $dateFilter)
+            .dropFirst() // Skip initial value
+            .receive(on: RunLoop.main) // Ensure it runs after SwiftUI state update
             .sink { [weak self] _, _ in
                 self?.applyFilters()
             }
@@ -101,13 +106,41 @@ class ClipboardViewModel: ObservableObject {
 
     /// Copy and paste an item (copy then simulate paste)
     func copyAndPaste(_ item: ClipItem) {
+        // 1. Always copy to clipboard first
         copyItem(item)
 
-        // Close the drawer first to return focus to previous app
+        // 2. Read paste mode setting (default: activeApp)
+        let pasteMode = UserDefaults.standard.string(forKey: "pasteMode") ?? "activeApp"
+
+        // 3. Handle clipboard mode (copy only, no permission check)
+        if pasteMode == "clipboard" {
+            print("📋 剪贴板模式：项目已复制到剪贴板")
+            // Close drawer and return (no permission check, no paste)
+            onPrepareForPaste?()
+            onRequestClose?()
+            return
+        }
+
+        // 4. Handle activeApp mode (auto-paste with permission check)
+        // Close drawer first (regardless of permission)
+        onPrepareForPaste?()
         onRequestClose?()
 
-        // Simulate Cmd+V after drawer closes
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+        // Check accessibility permission
+        let hasPermission = AccessibilityPermissionGuide.shared.hasPermission
+
+        if !hasPermission {
+            // Force show permission guide (ignores "don't show again")
+            AccessibilityPermissionGuide.shared.showGuide()
+            print("⚠️ 自动粘贴不可用：未授予辅助功能权限")
+            print("💡 内容已复制到剪贴板，可手动使用 Cmd+V 粘贴")
+            return
+        }
+
+        // Permission granted - auto-paste
+        // Paste almost immediately (just a tiny delay to ensure window level is lowered)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+            print("📋 模拟粘贴到活动应用...")
             self.simulatePaste()
         }
     }
@@ -259,17 +292,37 @@ class ClipboardViewModel: ObservableObject {
         // Create and post a Cmd+V keyboard event
         let source = CGEventSource(stateID: .hidSystemState)
 
-        // Key down
-        if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true) {
-            keyDown.flags = .maskCommand
-            keyDown.post(tap: .cghidEventTap)
+        // Virtual key code 0x09 is 'V'
+        let vKeyCode: CGKeyCode = 0x09
+
+        // Create key down event
+        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: true) else {
+            print("⚠️ Failed to create key down event")
+            return
         }
 
-        // Key up
-        if let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false) {
-            keyUp.flags = .maskCommand
-            keyUp.post(tap: .cghidEventTap)
+        // Set Command flag
+        keyDown.flags = .maskCommand
+
+        // Post key down
+        keyDown.post(tap: .cghidEventTap)
+
+        // Small delay between key down and key up
+        usleep(10000) // 10ms delay
+
+        // Create key up event
+        guard let keyUp = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: false) else {
+            print("⚠️ Failed to create key up event")
+            return
         }
+
+        // Set Command flag
+        keyUp.flags = .maskCommand
+
+        // Post key up
+        keyUp.post(tap: .cghidEventTap)
+
+        print("✅ Paste event posted successfully")
     }
 
     // MARK: - Computed Properties

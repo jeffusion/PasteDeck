@@ -166,6 +166,108 @@ enum ClipContent: Codable, Equatable {
         return false
     }
 
+    // MARK: - Metadata Properties
+
+    /// Character count for text content
+    var characterCount: Int? {
+        switch self {
+        case .text(let string, _):
+            return string.count
+        default:
+            return nil
+        }
+    }
+
+    /// Image dimensions (width × height) for image content
+    var imageDimensions: String? {
+        switch self {
+        case .image(let data, _):
+            guard let nsImage = NSImage(data: data),
+                  let representation = nsImage.representations.first else {
+                return nil
+            }
+            let width = representation.pixelsWide
+            let height = representation.pixelsHigh
+            return "\(width) × \(height)"
+        default:
+            return nil
+        }
+    }
+
+    /// File extension for file content
+    var fileExtension: String? {
+        switch self {
+        case .file(let url):
+            let ext = url.pathExtension
+            return ext.isEmpty ? nil : ext.uppercased()
+        case .multipleFiles(let urls):
+            if urls.count == 1 {
+                let ext = urls[0].pathExtension
+                return ext.isEmpty ? nil : ext.uppercased()
+            } else {
+                return "\(urls.count) 个文件"
+            }
+        default:
+            return nil
+        }
+    }
+
+    /// Actual file size from filesystem
+    var actualFileSize: Int64? {
+        switch self {
+        case .file(let url):
+            return try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64
+        case .multipleFiles(let urls):
+            let sizes = urls.compactMap { url -> Int64? in
+                try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64
+            }
+            return sizes.isEmpty ? nil : sizes.reduce(0, +)
+        default:
+            return nil
+        }
+    }
+
+    /// Display metadata for card footer based on content type
+    var displayMetadata: String {
+        switch self {
+        case .text:
+            if let count = characterCount {
+                return "\(count) 字符"
+            }
+            return ""
+
+        case .image:
+            return imageDimensions ?? ""
+
+        case .url(let url):
+            if let host = url.host {
+                return host
+            }
+            return url.absoluteString
+
+        case .file, .multipleFiles:
+            var parts: [String] = []
+
+            // File size
+            if let size = actualFileSize {
+                let formatter = ByteCountFormatter()
+                formatter.allowedUnits = [.useKB, .useMB, .useGB]
+                formatter.countStyle = .file
+                parts.append(formatter.string(fromByteCount: size))
+            }
+
+            // File extension
+            if let ext = fileExtension {
+                parts.append(ext)
+            }
+
+            return parts.joined(separator: " · ")
+
+        case .color(let colorInfo):
+            return colorInfo.hexString
+        }
+    }
+
     // MARK: - Codable Implementation
 
     enum CodingKeys: String, CodingKey {
