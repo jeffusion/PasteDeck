@@ -13,7 +13,7 @@ struct CardGridView: View {
     @Binding var selectedItem: ClipItem?
 
     private let cardSpacing: CGFloat = 12
-    private let cardSize: CGFloat = 150
+    private let cardSize: CGFloat = 180
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -22,7 +22,10 @@ struct CardGridView: View {
                     ForEach(viewModel.filteredItems) { item in
                         ClipCardView(
                             item: item,
-                            isSelected: selectedItem?.id == item.id
+                            isSelected: selectedItem?.id == item.id,
+                            onSelect: {
+                                selectedItem = item
+                            }
                         )
                         .id(item.id)
                     }

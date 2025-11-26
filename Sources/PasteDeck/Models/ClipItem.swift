@@ -8,6 +8,7 @@
 
 import Foundation
 import CloudKit
+import SwiftUI
 
 /// Represents a single clipboard item with metadata
 struct ClipItem: Identifiable, Codable, Equatable, Hashable {
@@ -342,6 +343,28 @@ extension ClipItem {
             case .links: return "link"
             case .files: return "doc"
             case .colors: return "paintpalette"
+            }
+        }
+
+        var displayName: String {
+            switch self {
+            case .all: return "全部"
+            case .text: return "文本"
+            case .images: return "图片"
+            case .links: return "链接"
+            case .files: return "文件"
+            case .colors: return "颜色"
+            }
+        }
+
+        var dotColor: Color {
+            switch self {
+            case .all: return .gray
+            case .text: return .blue
+            case .images: return .purple
+            case .links: return .green
+            case .files: return .orange
+            case .colors: return .pink
             }
         }
 
