@@ -7,70 +7,141 @@
 //
 
 import SwiftUI
+import AppKit
+
+// MARK: - Instant Click Handler (No Delay)
+
+struct InstantClickHandler: NSViewRepresentable {
+    let onSingleClick: () -> Void
+    let onDoubleClick: () -> Void
+    let onClearFocus: () -> Void
+
+    func makeNSView(context: Context) -> ClickableNSView {
+        let view = ClickableNSView()
+        view.onSingleClick = onSingleClick
+        view.onDoubleClick = onDoubleClick
+        view.onClearFocus = onClearFocus
+        return view
+    }
+
+    func updateNSView(_ nsView: ClickableNSView, context: Context) {
+        nsView.onSingleClick = onSingleClick
+        nsView.onDoubleClick = onDoubleClick
+        nsView.onClearFocus = onClearFocus
+    }
+
+    class ClickableNSView: NSView {
+        var onSingleClick: (() -> Void)?
+        var onDoubleClick: (() -> Void)?
+        var onClearFocus: (() -> Void)?
+
+        override func mouseDown(with event: NSEvent) {
+            // Clear focus first
+            onClearFocus?()
+
+            // Check for double click first
+            if event.clickCount == 2 {
+                // Double click - only trigger double click action
+                onDoubleClick?()
+            } else {
+                // Single click - immediately trigger selection (no delay)
+                onSingleClick?()
+            }
+        }
+    }
+}
 
 struct ClipCardView: View {
     @EnvironmentObject var viewModel: ClipboardViewModel
+    @EnvironmentObject var focusManager: FocusManager
     let item: ClipItem
     let isSelected: Bool
+    let onSelect: () -> Void
 
     @State private var isHovered = false
 
-    private let cardSize: CGFloat = 150
+    private let cardSize: CGFloat = 180
+
+    /// Unified brand blue color for all type badges (Paste style)
+    private let badgeColor = Color(red: 0.2, green: 0.5, blue: 1.0)
 
     var body: some View {
         VStack(spacing: 0) {
-            // Content preview
-            contentPreview
-                .frame(width: cardSize, height: cardSize - 30)
-                .clipped()
-
-            // Footer with metadata
-            HStack(spacing: 4) {
-                Image(systemName: item.content.iconName)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-
-                Text(item.relativeTimestamp)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
+            // Type badge at top (Paste style - full width)
+            HStack(spacing: 8) {
+                // Left: icon + type name
+                HStack(spacing: 4) {
+                    Image(systemName: item.content.iconName)
+                        .font(.system(size: 11))
+                    Text(item.content.typeName)
+                        .font(.system(size: 11, weight: .medium))
+                }
 
                 Spacer()
 
-                // Badges
-                if item.isFavorite {
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 8))
-                        .foregroundColor(.yellow)
-                }
-                if item.isPinned {
-                    Image(systemName: "pin.fill")
-                        .font(.system(size: 8))
-                        .foregroundColor(.orange)
-                }
+                // Right: relative time
+                Text(item.relativeTimestamp)
+                    .font(.system(size: 11))
             }
-            .padding(.horizontal, 8)
+            .foregroundColor(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(badgeColor)
+            .clipShape(RoundedCornerShape(corners: [.topLeft, .topRight], radius: 8))
+
+            Spacer()
+
+            // Content preview
+            contentPreview
+                .frame(width: cardSize - 16, height: cardSize - 90)
+                .clipped()
+                .padding(.horizontal, 8)
+
+            Spacer()
+
+            // Footer with size/character metadata
+            HStack {
+                Text(item.content.displayMetadata)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                Spacer()
+            }
+            .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(Color(nsColor: .controlBackgroundColor).opacity(0.8))
+            .background(.ultraThinMaterial)
         }
         .frame(width: cardSize, height: cardSize)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .contentShape(Rectangle())
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: 8)
                 .stroke(
-                    isSelected ? Color.accentColor : (isHovered ? Color.secondary.opacity(0.5) : Color.clear),
+                    isSelected ? Color.accentColor : (isHovered ? Color.white.opacity(0.3) : Color.white.opacity(0.1)),
                     lineWidth: isSelected ? 2 : 1
                 )
         )
-        .shadow(color: .black.opacity(isHovered ? 0.3 : 0.15), radius: isHovered ? 8 : 4, y: 2)
+        .shadow(color: .black.opacity(isHovered ? 0.25 : 0.15), radius: isHovered ? 6 : 3, y: 2)
         .scaleEffect(isHovered ? 1.02 : 1.0)
         .animation(.easeInOut(duration: 0.15), value: isHovered)
+        .overlay(
+            // Use NSView-based click handler for instant response (no SwiftUI gesture delay)
+            InstantClickHandler(
+                onSingleClick: {
+                    onSelect()
+                },
+                onDoubleClick: {
+                    viewModel.copyAndPaste(item)
+                },
+                onClearFocus: {
+                    focusManager.clearSearchFocus()
+                }
+            )
+            .allowsHitTesting(true)
+        )
         .onHover { hovering in
             isHovered = hovering
-        }
-        .onTapGesture {
-            viewModel.copyAndPaste(item)
         }
         .contextMenu {
             ClipCardContextMenu(item: item)
@@ -118,6 +189,9 @@ struct ClipCardView: View {
                 Image(nsImage: nsImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
+                    .frame(width: cardSize - 16, height: cardSize - 90)
+                    .clipped()
+                    .contentShape(Rectangle())
             } else {
                 iconPlaceholder("photo")
             }
@@ -249,6 +323,87 @@ struct ClipCardContextMenu: View {
     }
 }
 
+// MARK: - Custom Shape for Top Corners Only
+
+struct RoundedCornerShape: Shape {
+    var corners: Set<Corner>
+    var radius: CGFloat
+
+    enum Corner {
+        case topLeft, topRight, bottomLeft, bottomRight
+    }
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+
+        let topLeft = corners.contains(.topLeft) ? radius : 0
+        let topRight = corners.contains(.topRight) ? radius : 0
+        let bottomLeft = corners.contains(.bottomLeft) ? radius : 0
+        let bottomRight = corners.contains(.bottomRight) ? radius : 0
+
+        path.move(to: CGPoint(x: rect.minX + topLeft, y: rect.minY))
+
+        // Top edge
+        path.addLine(to: CGPoint(x: rect.maxX - topRight, y: rect.minY))
+
+        // Top right corner
+        if topRight > 0 {
+            path.addArc(
+                center: CGPoint(x: rect.maxX - topRight, y: rect.minY + topRight),
+                radius: topRight,
+                startAngle: .degrees(-90),
+                endAngle: .degrees(0),
+                clockwise: false
+            )
+        }
+
+        // Right edge
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - bottomRight))
+
+        // Bottom right corner
+        if bottomRight > 0 {
+            path.addArc(
+                center: CGPoint(x: rect.maxX - bottomRight, y: rect.maxY - bottomRight),
+                radius: bottomRight,
+                startAngle: .degrees(0),
+                endAngle: .degrees(90),
+                clockwise: false
+            )
+        }
+
+        // Bottom edge
+        path.addLine(to: CGPoint(x: rect.minX + bottomLeft, y: rect.maxY))
+
+        // Bottom left corner
+        if bottomLeft > 0 {
+            path.addArc(
+                center: CGPoint(x: rect.minX + bottomLeft, y: rect.maxY - bottomLeft),
+                radius: bottomLeft,
+                startAngle: .degrees(90),
+                endAngle: .degrees(180),
+                clockwise: false
+            )
+        }
+
+        // Left edge
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + topLeft))
+
+        // Top left corner
+        if topLeft > 0 {
+            path.addArc(
+                center: CGPoint(x: rect.minX + topLeft, y: rect.minY + topLeft),
+                radius: topLeft,
+                startAngle: .degrees(180),
+                endAngle: .degrees(270),
+                clockwise: false
+            )
+        }
+
+        path.closeSubpath()
+        return path
+    }
+}
+
 // MARK: - Preview
 
 #if DEBUG
@@ -260,7 +415,8 @@ struct ClipCardView_Previews: PreviewProvider {
                     content: .text("Hello, World! This is a sample text that might be longer.", isRTF: false),
                     sourceApp: "TextEdit"
                 ),
-                isSelected: false
+                isSelected: false,
+                onSelect: { }
             )
 
             ClipCardView(
@@ -269,7 +425,8 @@ struct ClipCardView_Previews: PreviewProvider {
                     sourceApp: "Safari",
                     isFavorite: true
                 ),
-                isSelected: true
+                isSelected: true,
+                onSelect: { }
             )
         }
         .padding()
