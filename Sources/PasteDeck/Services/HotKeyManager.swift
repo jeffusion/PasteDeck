@@ -51,18 +51,18 @@ class HotKeyManager: ObservableObject {
     // MARK: - Setup
 
     private func setupShortcuts() {
-        // Show clipboard window
-        KeyboardShortcuts.onKeyUp(for: .showClipboard) { [weak self] in
+        // Show clipboard window - use onKeyDown for instant response
+        KeyboardShortcuts.onKeyDown(for: .showClipboard) { [weak self] in
             self?.onShowClipboard?()
         }
 
-        // Clear history
-        KeyboardShortcuts.onKeyUp(for: .clearHistory) { [weak self] in
+        // Clear history - use onKeyDown for instant response
+        KeyboardShortcuts.onKeyDown(for: .clearHistory) { [weak self] in
             self?.onClearHistory?()
         }
 
-        // Search clipboard
-        KeyboardShortcuts.onKeyUp(for: .searchClipboard) { [weak self] in
+        // Search clipboard - use onKeyDown for instant response
+        KeyboardShortcuts.onKeyDown(for: .searchClipboard) { [weak self] in
             self?.onSearchClipboard?()
         }
 
@@ -107,25 +107,6 @@ class HotKeyManager: ObservableObject {
 
         if !trusted {
             print("⌨️ HotKeyManager: Accessibility permission not granted")
-        }
-    }
-
-    /// Request accessibility permission
-    func requestAccessibilityPermission() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-        AXIsProcessTrustedWithOptions(options as CFDictionary)
-        print("⌨️ HotKeyManager: Requested accessibility permission")
-
-        // Check again after a delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
-            self?.checkAccessibilityPermission()
-        }
-    }
-
-    /// Open System Preferences to Accessibility settings
-    func openAccessibilitySettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-            NSWorkspace.shared.open(url)
         }
     }
 }
