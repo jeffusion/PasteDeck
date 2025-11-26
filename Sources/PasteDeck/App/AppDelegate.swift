@@ -22,10 +22,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotKeyManager: HotKeyManager!
     private var cancellables = Set<AnyCancellable>()
     private var isShowingWindow = false
+    private var globalKeyEventMonitor: Any?
+    private var globalMouseEventMonitor: Any?
+    private var settingsWindow: NSWindow?
 
     // MARK: - Application Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Register default settings before any initialization
+        registerDefaultSettings()
+
         // Configure app to be menu bar only
         NSApp.setActivationPolicy(.accessory)
 
@@ -35,8 +41,55 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupStatusBar()
         setupClipboardWindow()
         setupKeyboardShortcuts()
+        setupNotifications()
+        setupLaunchAtLogin()
 
         print("🚀 PasteDeck launched successfully")
+    }
+
+    private func registerDefaultSettings() {
+        // Register default values for all user preferences
+        // This ensures consistent behavior on first launch and when using UserDefaults directly
+        let defaults: [String: Any] = [
+            "launchAtLogin": false,
+            "iCloudSyncEnabled": true,
+            "showInMenuBar": true,          // Menu bar icon visible by default
+            "soundEnabled": true,
+            "pasteMode": "activeApp",
+            "alwaysPastePlainText": false,
+            "historyRetentionDays": 30
+        ]
+        UserDefaults.standard.register(defaults: defaults)
+        print("⚙️ Default settings registered")
+    }
+
+    private func setupNotifications() {
+        // Listen for settings window request
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(showSettings),
+            name: NSNotification.Name("ShowSettingsWindow"),
+            object: nil
+        )
+
+        // Listen for UserDefaults changes to update status bar visibility
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(userDefaultsDidChange),
+            name: UserDefaults.didChangeNotification,
+            object: nil
+        )
+    }
+
+    @objc private func userDefaultsDidChange() {
+        // Update status bar visibility when showInMenuBar setting changes
+        updateStatusBarVisibility()
+    }
+
+    private func setupLaunchAtLogin() {
+        // Sync launch at login state with user preference
+        let userPreference = UserDefaults.standard.bool(forKey: "launchAtLogin")
+        _ = LaunchAtLoginService.shared.sync(with: userPreference)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -56,6 +109,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupStatusBar() {
+        // Check user preference for showing in menu bar
+        // Default value (true) is registered in registerDefaultSettings()
+        let showInMenuBar = UserDefaults.standard.bool(forKey: "showInMenuBar")
+
+        guard showInMenuBar else {
+            print("⚠️ Status bar icon hidden by user preference")
+            return
+        }
+
+        createStatusBarItem()
+    }
+
+    private func createStatusBarItem() {
         // Create status bar item
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
@@ -67,62 +133,36 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 accessibilityDescription: "PasteDeck"
             )?.withSymbolConfiguration(config)
 
+            // Both left and right click toggle the drawer
             button.action = #selector(statusBarButtonClicked)
             button.target = self
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
 
-        setupStatusBarMenu()
+        // Note: Menu has been moved to the drawer header
+        print("✅ Status bar icon created")
     }
 
-    private func setupStatusBarMenu() {
-        let menu = NSMenu()
+    private func removeStatusBarItem() {
+        if let item = statusItem {
+            NSStatusBar.system.removeStatusItem(item)
+            statusItem = nil
+            print("✅ Status bar icon removed")
+        }
+    }
 
-        // Quick actions
-        menu.addItem(NSMenuItem(
-            title: "Show Clipboard",
-            action: #selector(showClipboardWindow),
-            keyEquivalent: ""
-        ))
+    private func updateStatusBarVisibility() {
+        let showInMenuBar = UserDefaults.standard.bool(forKey: "showInMenuBar")
 
-        menu.addItem(.separator())
-
-        // Statistics
-        let statsItem = NSMenuItem(
-            title: "0 items captured",
-            action: nil,
-            keyEquivalent: ""
-        )
-        statsItem.isEnabled = false
-        menu.addItem(statsItem)
-
-        menu.addItem(.separator())
-
-        // Settings
-        menu.addItem(NSMenuItem(
-            title: "Settings...",
-            action: #selector(showSettings),
-            keyEquivalent: ","
-        ))
-
-        // About
-        menu.addItem(NSMenuItem(
-            title: "About PasteDeck",
-            action: #selector(showAbout),
-            keyEquivalent: ""
-        ))
-
-        menu.addItem(.separator())
-
-        // Quit
-        menu.addItem(NSMenuItem(
-            title: "Quit PasteDeck",
-            action: #selector(NSApplication.terminate(_:)),
-            keyEquivalent: "q"
-        ))
-
-        // Store reference for later updates
-        statusItem.menu = menu
+        if showInMenuBar {
+            // Show status bar icon if not already visible
+            if statusItem == nil {
+                createStatusBarItem()
+            }
+        } else {
+            // Hide status bar icon if visible
+            removeStatusBarItem()
+        }
     }
 
     private func setupClipboardWindow() {
@@ -135,41 +175,84 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Calculate drawer size and position (bottom of screen)
         let screenFrame = NSScreen.main?.visibleFrame ?? .zero
-        let drawerHeight: CGFloat = 220
-        let windowSize = CGSize(width: screenFrame.width, height: drawerHeight)
+        let drawerHeight: CGFloat = 280
 
-        // Start off-screen (below visible area) for animation
-        let windowOrigin = CGPoint(
+        // Window positioned at visible area (not off-screen)
+        let windowRect = CGRect(
             x: screenFrame.origin.x,
-            y: screenFrame.origin.y - drawerHeight
+            y: screenFrame.origin.y,
+            width: screenFrame.width,
+            height: drawerHeight
         )
-        let windowRect = CGRect(origin: windowOrigin, size: windowSize)
 
         // Create panel with borderless style for drawer appearance
-        clipboardWindow = NSPanel(
+        clipboardWindow = KeyablePanel(
             contentRect: windowRect,
-            styleMask: [.borderless, .fullSizeContentView, .utilityWindow],
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
 
+        // Create clipping container view
+        let clippingContainer = ClippingContainerView(frame: NSRect(
+            x: 0,
+            y: 0,
+            width: screenFrame.width,
+            height: drawerHeight
+        ))
+        clippingContainer.autoresizingMask = [.width, .height]
+
+        // Create visual effect view for frosted glass effect
+        let visualEffectView = NSVisualEffectView()
+        visualEffectView.material = .popover
+        visualEffectView.state = .active
+        visualEffectView.blendingMode = .behindWindow
+        visualEffectView.wantsLayer = true
+
+        // Position visual effect view off-screen initially (within the clipping container)
+        visualEffectView.frame = NSRect(
+            x: 0,
+            y: -drawerHeight,
+            width: screenFrame.width,
+            height: drawerHeight
+        )
+        visualEffectView.autoresizingMask = [.width]
+
+        // Add SwiftUI view on top of visual effect
+        hostingController.view.frame = visualEffectView.bounds
+        hostingController.view.autoresizingMask = [.width, .height]
+        visualEffectView.addSubview(hostingController.view)
+
+        // Add visual effect view to clipping container
+        clippingContainer.addSubview(visualEffectView)
+
+        // Set clipping container as window content
+        clipboardWindow.contentView = clippingContainer
+
         // Configure panel for drawer behavior
-        clipboardWindow.contentView = hostingController.view
         clipboardWindow.isFloatingPanel = true
         clipboardWindow.level = .popUpMenu
         clipboardWindow.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        clipboardWindow.backgroundColor = NSColor(white: 0.15, alpha: 0.98)
+        clipboardWindow.backgroundColor = .clear
         clipboardWindow.isOpaque = false
         clipboardWindow.hasShadow = true
         clipboardWindow.hidesOnDeactivate = false
-        clipboardWindow.becomesKeyOnlyIfNeeded = false
+        clipboardWindow.isMovable = false
 
         // Handle window close
         clipboardWindow.delegate = self
 
-        // Set up close callback for ViewModel
+        // Set up callbacks for ViewModel
         clipboardViewModel.onRequestClose = { [weak self] in
             self?.hideClipboardWindow()
+        }
+
+        clipboardViewModel.onPrepareForPaste = { [weak self] in
+            guard let self = self else { return }
+            // Immediately lower window level so keyboard events can reach the original app
+            // This allows paste to work instantly without waiting for drawer to close
+            self.clipboardWindow.level = .normal
+            self.clipboardWindow.resignKey()
         }
     }
 
@@ -190,33 +273,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Focus search field after window appears
         }
 
-        // Check accessibility permission
-        if !hotKeyManager.hasAccessibilityPermission {
-            hotKeyManager.requestAccessibilityPermission()
-        }
-
         print("⌨️ Keyboard shortcuts setup completed")
     }
 
     // MARK: - Actions
 
     @objc private func statusBarButtonClicked(_ sender: NSStatusBarButton) {
-        guard let event = NSApp.currentEvent else { return }
-
-        if event.type == .rightMouseUp {
-            // Right click - show menu
-            statusItem.menu = statusItem.menu
-            statusItem.button?.performClick(nil)
-        } else {
-            // Left click - toggle window
-            toggleClipboardWindow()
-        }
+        // Both left and right click toggle the drawer
+        // Menu is now in the drawer header
+        toggleClipboardWindow()
     }
 
     @objc private func showClipboardWindow() {
         guard !clipboardWindow.isVisible else {
-            clipboardWindow.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+            clipboardWindow.orderFront(nil)
             return
         }
 
@@ -225,36 +295,70 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Use full screen frame for width, visibleFrame for height calculation
         let fullFrame = NSScreen.main?.frame ?? .zero
         let visibleFrame = NSScreen.main?.visibleFrame ?? .zero
-        let drawerHeight: CGFloat = 220
+        let drawerHeight: CGFloat = 280
 
-        // Update window size to match full screen width
-        let windowSize = CGSize(width: fullFrame.width, height: drawerHeight)
-        clipboardWindow.setContentSize(windowSize)
-
-        // Position window off-screen first (below visible area)
-        clipboardWindow.setFrameOrigin(CGPoint(
-            x: fullFrame.origin.x,
-            y: visibleFrame.origin.y - drawerHeight
-        ))
-
-        // Show window and activate
-        clipboardWindow.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-
-        // Animate slide up
-        let targetFrame = CGRect(
+        // Position window at visible area (stays in place)
+        let windowRect = CGRect(
             x: fullFrame.origin.x,
             y: visibleFrame.origin.y,
             width: fullFrame.width,
             height: drawerHeight
         )
+        clipboardWindow.setFrame(windowRect, display: false)
 
+        // Get the visual effect view (first subview of clipping container)
+        guard let clippingContainer = clipboardWindow.contentView,
+              let visualEffectView = clippingContainer.subviews.first else {
+            return
+        }
+
+        // Reset visual effect view to off-screen position (within container)
+        visualEffectView.frame = NSRect(
+            x: 0,
+            y: -drawerHeight,
+            width: fullFrame.width,
+            height: drawerHeight
+        )
+
+        // Show window and make it key (but don't activate app, preserving original app focus)
+        // This allows clicks to work immediately without needing a first click to focus
+        clipboardWindow.makeKeyAndOrderFront(nil)
+
+        // Add global event monitor for ESC key (works even when focus is in other app)
+        globalKeyEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if event.keyCode == 53 { // ESC key
+                self?.hideClipboardWindow()
+            }
+        }
+
+        // Add global event monitor for clicks outside drawer
+        globalMouseEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            guard let self = self, self.clipboardWindow.isVisible else { return }
+
+            // Check if click is outside the drawer window
+            let windowFrame = self.clipboardWindow.frame
+            let screenPoint = NSEvent.mouseLocation
+
+            if !windowFrame.contains(screenPoint) {
+                self.hideClipboardWindow()
+            }
+        }
+
+        // Animate visual effect view sliding up within the clipping container
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.25
+            context.duration = 0.15
+            // Ultra snappy ease-out: instant start, smooth deceleration
+            // Similar to macOS system animations
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             context.allowsImplicitAnimation = true
 
-            self.clipboardWindow.setFrame(targetFrame, display: true, animate: true)
+            // Slide to visible position (y: 0)
+            visualEffectView.animator().frame = NSRect(
+                x: 0,
+                y: 0,
+                width: fullFrame.width,
+                height: drawerHeight
+            )
         }, completionHandler: { [weak self] in
             self?.isShowingWindow = false
         })
@@ -263,26 +367,47 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func hideClipboardWindow() {
         guard clipboardWindow.isVisible else { return }
 
+        // Remove event monitors
+        if let monitor = globalKeyEventMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalKeyEventMonitor = nil
+        }
+        if let monitor = globalMouseEventMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalMouseEventMonitor = nil
+        }
+
         let fullFrame = NSScreen.main?.frame ?? .zero
-        let visibleFrame = NSScreen.main?.visibleFrame ?? .zero
-        let drawerHeight: CGFloat = 220
+        let drawerHeight: CGFloat = 280
 
-        // Animate slide down
-        let targetFrame = CGRect(
-            x: fullFrame.origin.x,
-            y: visibleFrame.origin.y - drawerHeight,
-            width: fullFrame.width,
-            height: drawerHeight
-        )
+        // Get the visual effect view
+        guard let clippingContainer = clipboardWindow.contentView,
+              let visualEffectView = clippingContainer.subviews.first else {
+            clipboardWindow.orderOut(nil)
+            clipboardWindow.level = .popUpMenu
+            return
+        }
 
+        // Animate visual effect view sliding down
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.2
+            context.duration = 0.12
+            // Quick ease-in: instant start, accelerate to finish
+            // Similar to macOS dismiss animations
             context.timingFunction = CAMediaTimingFunction(name: .easeIn)
             context.allowsImplicitAnimation = true
 
-            self.clipboardWindow.setFrame(targetFrame, display: true, animate: true)
+            // Slide to off-screen position (y: -drawerHeight)
+            visualEffectView.animator().frame = NSRect(
+                x: 0,
+                y: -drawerHeight,
+                width: fullFrame.width,
+                height: drawerHeight
+            )
         }, completionHandler: { [weak self] in
-            self?.clipboardWindow.orderOut(nil)
+            guard let self = self else { return }
+            self.clipboardWindow.orderOut(nil)
+            // Restore window level for next time
+            self.clipboardWindow.level = .popUpMenu
         })
     }
 
@@ -294,8 +419,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    @objc private func showSettings() {
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+    @objc func showSettings() {
+        // Create settings window if it doesn't exist
+        if settingsWindow == nil {
+            let hostingController = NSHostingController(rootView: SettingsView())
+            let window = NSWindow(contentViewController: hostingController)
+            window.title = "设置"
+            window.styleMask = [.titled, .closable, .miniaturizable]
+            window.setContentSize(NSSize(width: 650, height: 500))
+            window.center()
+            window.isReleasedWhenClosed = false
+            settingsWindow = window
+        }
+
+        settingsWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -304,16 +441,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    // MARK: - Helper Methods
-
-    private func updateStatusBarMenu() {
-        // Update statistics in menu
-        if let menu = statusItem.menu,
-           let statsItem = menu.items.first(where: { $0.title.contains("items") }) {
-            let count = clipboardViewModel.items.count
-            statsItem.title = "\(count) item\(count == 1 ? "" : "s") captured"
-        }
-    }
 }
 
 // MARK: - NSWindowDelegate
@@ -325,9 +452,39 @@ extension AppDelegate: NSWindowDelegate {
     }
 
     func windowDidResignKey(_ notification: Notification) {
-        // Don't auto-hide if we're in the middle of showing the window
-        guard !isShowingWindow else { return }
-        // Auto-hide drawer when it loses focus
-        hideClipboardWindow()
+        // Not used - we use global event monitor instead to detect clicks outside
+        // This preserves focus in the original application
+    }
+}
+
+// MARK: - Custom Panel
+
+class KeyablePanel: NSPanel {
+    override var canBecomeKey: Bool {
+        return true
+    }
+
+    override var canBecomeMain: Bool {
+        return true
+    }
+}
+
+// MARK: - Clipping Container View
+
+class ClippingContainerView: NSView {
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setupClipping()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupClipping()
+    }
+
+    private func setupClipping() {
+        wantsLayer = true
+        layer?.masksToBounds = true
+        layer?.backgroundColor = .clear
     }
 }
