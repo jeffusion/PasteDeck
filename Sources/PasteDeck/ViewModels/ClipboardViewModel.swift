@@ -170,6 +170,9 @@ class ClipboardViewModel: ObservableObject {
         items.removeAll { $0.id == item.id }
         saveItems()
         applyFilters()
+
+        // Play sound effect for deletion
+        SoundManager.shared.playSound(for: .deleted)
     }
 
     /// Delete multiple items
@@ -178,6 +181,9 @@ class ClipboardViewModel: ObservableObject {
         items.removeAll { idsToDelete.contains($0.id) }
         saveItems()
         applyFilters()
+
+        // Play sound effect for deletion
+        SoundManager.shared.playSound(for: .deleted)
     }
 
     /// Clear all non-permanent items
@@ -185,6 +191,9 @@ class ClipboardViewModel: ObservableObject {
         items.removeAll { !$0.isPermanent }
         saveItems()
         applyFilters()
+
+        // Play sound effect for clearing history
+        SoundManager.shared.playSound(for: .cleared)
     }
 
     /// Clear all items including favorites
@@ -192,6 +201,9 @@ class ClipboardViewModel: ObservableObject {
         items.removeAll()
         saveItems()
         applyFilters()
+
+        // Play sound effect for clearing all
+        SoundManager.shared.playSound(for: .cleared)
     }
 
     /// Clean up items older than specified retention days
@@ -267,6 +279,9 @@ class ClipboardViewModel: ObservableObject {
 
         saveItems()
         applyFilters()
+
+        // Play sound effect for new clipboard capture
+        SoundManager.shared.playSound(for: .captured)
     }
 
     private func isSimilarContent(_ content1: ClipContent, _ content2: ClipContent) -> Bool {
