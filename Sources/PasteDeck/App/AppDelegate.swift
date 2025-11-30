@@ -19,7 +19,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var clipboardWindow: NSPanel!
     private var clipboardMonitor: ClipboardMonitor!
     private var clipboardViewModel: ClipboardViewModel!
-    private var hotKeyManager: HotKeyManager!
+    private var hotKeyManager = HotKeyManager.shared
     private var cancellables = Set<AnyCancellable>()
     private var isShowingWindow = false
     private var globalKeyEventMonitor: Any?
@@ -43,6 +43,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupKeyboardShortcuts()
         setupNotifications()
         setupLaunchAtLogin()
+
+        // Perform startup cleanup based on retention settings
+        performStartupCleanup()
 
         print("🚀 PasteDeck launched successfully")
     }
@@ -90,6 +93,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Sync launch at login state with user preference
         let userPreference = UserDefaults.standard.bool(forKey: "launchAtLogin")
         _ = LaunchAtLoginService.shared.sync(with: userPreference)
+    }
+
+    private func performStartupCleanup() {
+        // Read retention setting
+        let retentionDays = UserDefaults.standard.integer(forKey: "historyRetentionDays")
+
+        // Skip cleanup if set to permanent (-1) or invalid value
+        guard retentionDays > 0 else {
+            print("🧹 Startup cleanup skipped (retention: \(retentionDays == -1 ? "permanent" : "invalid"))")
+            return
+        }
+
+        // Perform cleanup in background
+        Task {
+            let deletedCount = clipboardViewModel.cleanupExpiredItems(retentionDays: retentionDays)
+            if deletedCount > 0 {
+                print("🧹 Startup cleanup: Deleted \(deletedCount) expired items (retention: \(retentionDays) days)")
+            } else {
+                print("🧹 Startup cleanup: No expired items to delete")
+            }
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -257,8 +281,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupKeyboardShortcuts() {
-        hotKeyManager = HotKeyManager()
-
         // Set up callbacks
         hotKeyManager.onShowClipboard = { [weak self] in
             self?.toggleClipboardWindow()
@@ -268,9 +290,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.clipboardViewModel.clearHistory()
         }
 
-        hotKeyManager.onSearchClipboard = { [weak self] in
-            self?.showClipboardWindow()
-            // Focus search field after window appears
+        hotKeyManager.onQuickPaste = { [weak self] position in
+            guard let self = self else { return }
+
+            // Get item at position (1-indexed)
+            let items = self.clipboardViewModel.filteredItems
+            guard position > 0 && position <= items.count else {
+                print("⚠️ Quick paste: No item at position \(position) (total: \(items.count))")
+                return
+            }
+
+            let item = items[position - 1]
+            print("⚡ Quick paste: Position \(position) - \(item.title)")
+            self.clipboardViewModel.copyAndPaste(item)
         }
 
         print("⌨️ Keyboard shortcuts setup completed")
@@ -289,6 +321,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             clipboardWindow.orderFront(nil)
             return
         }
+
+        // Prepare view for display (select first item)
+        clipboardViewModel.prepareForDisplay()
 
         isShowingWindow = true
 
@@ -408,6 +443,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self.clipboardWindow.orderOut(nil)
             // Restore window level for next time
             self.clipboardWindow.level = .popUpMenu
+            // Reset UI state to ensure clean state on next open
+            self.clipboardViewModel.resetUIState()
         })
     }
 
@@ -422,7 +459,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func showSettings() {
         // Create settings window if it doesn't exist
         if settingsWindow == nil {
-            let hostingController = NSHostingController(rootView: SettingsView())
+            let settingsView = SettingsView()
+                .environmentObject(clipboardViewModel)
+            let hostingController = NSHostingController(rootView: settingsView)
             let window = NSWindow(contentViewController: hostingController)
             window.title = "设置"
             window.styleMask = [.titled, .closable, .miniaturizable]

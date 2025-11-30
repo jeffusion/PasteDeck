@@ -62,6 +62,19 @@ struct MainWindow: View {
                 selectedItem = newItems.first
             }
         }
+        .onChange(of: viewModel.resetUITrigger) { trigger in
+            // Reset local UI state when drawer is closed
+            if trigger != nil {
+                selectedItem = nil
+                isSearchFocused = false
+            }
+        }
+        .onChange(of: viewModel.selectFirstItemTrigger) { trigger in
+            // Select first item when drawer is opened
+            if trigger != nil && !viewModel.filteredItems.isEmpty {
+                selectedItem = viewModel.filteredItems.first
+            }
+        }
         .background(
             KeyboardEventHandler(
                 onLeftArrow: { moveSelection(by: -1) },

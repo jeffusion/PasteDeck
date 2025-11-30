@@ -21,6 +21,8 @@ class ClipboardViewModel: ObservableObject {
     @Published var contentFilter: ClipItem.ContentFilter = .all
     @Published var dateFilter: ClipItem.DateFilter = .all
     @Published var isSearching: Bool = false
+    @Published var resetUITrigger: UUID? = nil
+    @Published var selectFirstItemTrigger: UUID? = nil
 
     // MARK: - Callbacks
 
@@ -192,6 +194,22 @@ class ClipboardViewModel: ObservableObject {
         applyFilters()
     }
 
+    /// Clean up items older than specified retention days
+    /// - Parameter retentionDays: Number of days to retain (-1 means keep forever)
+    /// - Returns: Number of items deleted
+    @discardableResult
+    func cleanupExpiredItems(retentionDays: Int) -> Int {
+        // Delete from database first
+        let deletedCount = storageService.deleteItemsOlderThan(days: retentionDays, keepPermanent: true)
+
+        // Reload items from storage to sync with database
+        items = storageService.fetchAll()
+        applyFilters()
+
+        print("📋 ClipboardViewModel: Cleaned up \(deletedCount) expired items (retention: \(retentionDays) days)")
+        return deletedCount
+    }
+
     /// Add a tag to an item
     func addTag(_ tag: String, to item: ClipItem) {
         if let index = items.firstIndex(where: { $0.id == item.id }) {
@@ -206,6 +224,23 @@ class ClipboardViewModel: ObservableObject {
             items[index].removeTag(tag)
             saveItems()
         }
+    }
+
+    /// Reset UI-related state to initial values
+    /// Called when drawer is closed to ensure clean state on next open
+    func resetUIState() {
+        searchText = ""
+        contentFilter = .all
+        dateFilter = .all
+        resetUITrigger = UUID()
+        print("🔄 ClipboardViewModel: UI state reset")
+    }
+
+    /// Prepare view for display (select first item)
+    /// Called when drawer is about to be shown
+    func prepareForDisplay() {
+        selectFirstItemTrigger = UUID()
+        print("👁️ ClipboardViewModel: Prepare for display")
     }
 
     // MARK: - Private Methods
