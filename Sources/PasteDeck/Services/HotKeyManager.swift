@@ -10,6 +10,39 @@ import Foundation
 import KeyboardShortcuts
 import AppKit
 
+// MARK: - Quick Paste Modifiers Configuration
+
+struct QuickPasteModifiers: Codable, Equatable {
+    var command: Bool
+    var control: Bool
+    var option: Bool
+    var shift: Bool
+
+    static let `default` = QuickPasteModifiers(command: true, control: false, option: false, shift: true)
+
+    var eventFlags: NSEvent.ModifierFlags {
+        var flags: NSEvent.ModifierFlags = []
+        if command { flags.insert(.command) }
+        if control { flags.insert(.control) }
+        if option { flags.insert(.option) }
+        if shift { flags.insert(.shift) }
+        return flags
+    }
+
+    var displayString: String {
+        var result = ""
+        if control { result += "⌃" }
+        if option { result += "⌥" }
+        if shift { result += "⇧" }
+        if command { result += "⌘" }
+        return result
+    }
+
+    var isValid: Bool {
+        command || control || option || shift
+    }
+}
+
 // MARK: - Shortcut Name Definitions
 
 extension KeyboardShortcuts.Name {
@@ -17,16 +50,17 @@ extension KeyboardShortcuts.Name {
     static let showClipboard = Self("showClipboard", default: .init(.v, modifiers: [.command, .shift]))
 
     /// Clear clipboard history
-    static let clearHistory = Self("clearHistory")
-
-    /// Search in clipboard
-    static let searchClipboard = Self("searchClipboard")
+    static let clearHistory = Self("clearHistory", default: .init(.delete, modifiers: [.command, .shift]))
 }
 
 // MARK: - HotKeyManager
 
 /// Manager for global keyboard shortcuts
 class HotKeyManager: ObservableObject {
+    // MARK: - Singleton
+
+    static let shared = HotKeyManager()
+
     // MARK: - Properties
 
     /// Callback when show clipboard shortcut is triggered
@@ -35,17 +69,36 @@ class HotKeyManager: ObservableObject {
     /// Callback when clear history shortcut is triggered
     var onClearHistory: (() -> Void)?
 
-    /// Callback when search shortcut is triggered
-    var onSearchClipboard: (() -> Void)?
+    /// Callback when quick paste shortcut is triggered (position 1-9)
+    var onQuickPaste: ((Int) -> Void)?
 
     /// Whether accessibility permissions are granted
     @Published private(set) var hasAccessibilityPermission: Bool = false
 
+    /// Quick paste modifiers configuration
+    @Published var quickPasteModifiers: QuickPasteModifiers {
+        didSet {
+            saveQuickPasteModifiers()
+            setupQuickPasteMonitor()
+        }
+    }
+
+    /// Global event monitor for quick paste
+    private var quickPasteMonitor: Any?
+
     // MARK: - Initialization
 
-    init() {
+    private init() {
+        self.quickPasteModifiers = Self.loadQuickPasteModifiers()
         setupShortcuts()
+        setupQuickPasteMonitor()
         checkAccessibilityPermission()
+    }
+
+    deinit {
+        if let monitor = quickPasteMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
     }
 
     // MARK: - Setup
@@ -61,12 +114,46 @@ class HotKeyManager: ObservableObject {
             self?.onClearHistory?()
         }
 
-        // Search clipboard - use onKeyDown for instant response
-        KeyboardShortcuts.onKeyDown(for: .searchClipboard) { [weak self] in
-            self?.onSearchClipboard?()
+        print("⌨️ HotKeyManager: Basic shortcuts registered")
+    }
+
+    private func setupQuickPasteMonitor() {
+        // Remove existing monitor
+        if let monitor = quickPasteMonitor {
+            NSEvent.removeMonitor(monitor)
+            quickPasteMonitor = nil
         }
 
-        print("⌨️ HotKeyManager: Shortcuts registered")
+        // Setup new monitor with current modifiers
+        let modifiers = quickPasteModifiers
+        quickPasteMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self = self else { return }
+
+            // Check if modifiers match
+            let eventModifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
+            guard eventModifiers == modifiers.eventFlags else { return }
+
+            // Map key codes to positions (1-9)
+            let position: Int?
+            switch event.keyCode {
+            case 18: position = 1  // 1
+            case 19: position = 2  // 2
+            case 20: position = 3  // 3
+            case 21: position = 4  // 4
+            case 23: position = 5  // 5
+            case 22: position = 6  // 6
+            case 26: position = 7  // 7
+            case 28: position = 8  // 8
+            case 25: position = 9  // 9
+            default: position = nil
+            }
+
+            if let position = position {
+                self.onQuickPaste?(position)
+            }
+        }
+
+        print("⌨️ HotKeyManager: Quick paste monitor setup with modifiers: \(modifiers.displayString)")
     }
 
     // MARK: - Shortcut Management
@@ -80,7 +167,7 @@ class HotKeyManager: ObservableObject {
     func resetToDefaults() {
         KeyboardShortcuts.reset(.showClipboard)
         KeyboardShortcuts.reset(.clearHistory)
-        KeyboardShortcuts.reset(.searchClipboard)
+        quickPasteModifiers = .default
         print("⌨️ HotKeyManager: Reset to defaults")
     }
 
@@ -89,11 +176,14 @@ class HotKeyManager: ObservableObject {
         if enabled {
             KeyboardShortcuts.enable(.showClipboard)
             KeyboardShortcuts.enable(.clearHistory)
-            KeyboardShortcuts.enable(.searchClipboard)
+            setupQuickPasteMonitor()
         } else {
             KeyboardShortcuts.disable(.showClipboard)
             KeyboardShortcuts.disable(.clearHistory)
-            KeyboardShortcuts.disable(.searchClipboard)
+            if let monitor = quickPasteMonitor {
+                NSEvent.removeMonitor(monitor)
+                quickPasteMonitor = nil
+            }
         }
         print("⌨️ HotKeyManager: Shortcuts \(enabled ? "enabled" : "disabled")")
     }
@@ -129,7 +219,24 @@ extension HotKeyManager {
         return [
             "Show Clipboard": Self.shortcutDescription(for: .showClipboard),
             "Clear History": Self.shortcutDescription(for: .clearHistory),
-            "Search": Self.shortcutDescription(for: .searchClipboard)
+            "Quick Paste": "\(quickPasteModifiers.displayString) + 1...9"
         ]
+    }
+
+    // MARK: - Quick Paste Configuration Persistence
+
+    private static let quickPasteModifiersKey = "quickPasteModifiers"
+
+    private static func loadQuickPasteModifiers() -> QuickPasteModifiers {
+        guard let data = UserDefaults.standard.data(forKey: quickPasteModifiersKey),
+              let modifiers = try? JSONDecoder().decode(QuickPasteModifiers.self, from: data) else {
+            return .default
+        }
+        return modifiers
+    }
+
+    private func saveQuickPasteModifiers() {
+        guard let data = try? JSONEncoder().encode(quickPasteModifiers) else { return }
+        UserDefaults.standard.set(data, forKey: Self.quickPasteModifiersKey)
     }
 }

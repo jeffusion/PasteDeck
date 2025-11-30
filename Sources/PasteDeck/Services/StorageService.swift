@@ -308,6 +308,60 @@ class StorageService: ObservableObject {
         }
     }
 
+    /// Delete items older than specified days
+    /// - Parameters:
+    ///   - days: Number of days to retain (-1 means keep forever)
+    ///   - keepPermanent: Whether to keep favorites and pinned items (default: true)
+    /// - Returns: Number of items deleted
+    @discardableResult
+    func deleteItemsOlderThan(days: Int, keepPermanent: Bool = true) -> Int {
+        // -1 means keep forever, don't delete anything
+        guard days != -1 else {
+            print("📦 StorageService: Retention set to permanent, skipping cleanup")
+            return 0
+        }
+
+        // Calculate cutoff date
+        let calendar = Calendar.current
+        guard let cutoffDate = calendar.date(byAdding: .day, value: -days, to: Date()) else {
+            print("📦 StorageService: Failed to calculate cutoff date")
+            return 0
+        }
+
+        // Build predicate
+        let request = ClipItemEntity.fetchRequest()
+        if keepPermanent {
+            // Delete only non-permanent items older than cutoff
+            request.predicate = NSPredicate(
+                format: "createdAt < %@ AND isFavorite == NO AND isPinned == NO",
+                cutoffDate as NSDate
+            )
+        } else {
+            // Delete all items older than cutoff (including favorites and pinned)
+            request.predicate = NSPredicate(format: "createdAt < %@", cutoffDate as NSDate)
+        }
+
+        do {
+            let entities = try context.fetch(request)
+            let deleteCount = entities.count
+
+            guard deleteCount > 0 else {
+                print("📦 StorageService: No items older than \(days) days to delete")
+                return 0
+            }
+
+            for entity in entities {
+                context.delete(entity)
+            }
+            try context.save()
+            print("📦 StorageService: Deleted \(deleteCount) items older than \(days) days (cutoff: \(cutoffDate))")
+            return deleteCount
+        } catch {
+            print("📦 StorageService: Failed to delete old items - \(error.localizedDescription)")
+            return 0
+        }
+    }
+
     /// Check if an item with the same content already exists
     func exists(content: ClipContent) -> UUID? {
         let request = ClipItemEntity.fetchRequest()
