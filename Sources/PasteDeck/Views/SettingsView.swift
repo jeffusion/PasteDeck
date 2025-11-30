@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import KeyboardShortcuts
 
 // MARK: - Settings Navigation Item
 
@@ -65,6 +66,8 @@ struct SettingsView: View {
 // MARK: - General Settings
 
 struct GeneralSettingsView: View {
+    @EnvironmentObject var viewModel: ClipboardViewModel
+
     @AppStorage("launchAtLogin") private var launchAtLogin = false
     @AppStorage("iCloudSyncEnabled") private var iCloudSyncEnabled = true
     @AppStorage("showInMenuBar") private var showInMenuBar = true
@@ -76,13 +79,12 @@ struct GeneralSettingsView: View {
     @State private var showErrorAlert = false
     @State private var errorMessage = ""
 
-    private let retentionOptions: [(String, Int)] = [
-        ("天", 1),
-        ("周", 7),
-        ("个月", 30),
-        ("年", 365),
-        ("永久", -1)
-    ]
+    // Retention time confirmation
+    @State private var previousRetentionDays: Int = 30
+    @State private var showRetentionConfirmation = false
+    @State private var pendingRetentionDays: Int?
+    @State private var showRetentionResult = false
+    @State private var deletedItemsCount = 0
 
     var body: some View {
         ScrollView {
@@ -167,25 +169,9 @@ struct GeneralSettingsView: View {
 
                 SettingsGroupBox {
                     VStack(spacing: 16) {
-                        // Slider
-                        HStack {
-                            ForEach(retentionOptions, id: \.1) { option in
-                                Text(option.0)
-                                    .font(.caption)
-                                    .foregroundColor(historyRetentionDays == option.1 ? .primary : .secondary)
-                                    .fontWeight(historyRetentionDays == option.1 ? .medium : .regular)
-                                    .frame(maxWidth: .infinity)
-                            }
-                        }
-
-                        Slider(
-                            value: Binding(
-                                get: { Double(retentionOptions.firstIndex(where: { $0.1 == historyRetentionDays }) ?? 2) },
-                                set: { historyRetentionDays = retentionOptions[Int($0)].1 }
-                            ),
-                            in: 0...Double(retentionOptions.count - 1),
-                            step: 1
-                        )
+                        // 自定义滑块组件（增加左右内边距）
+                        RetentionSlider(retentionDays: $historyRetentionDays)
+                            .padding(.horizontal, 20)
 
                         HStack {
                             Spacer()
@@ -205,6 +191,9 @@ struct GeneralSettingsView: View {
                 if launchAtLogin != actualState {
                     launchAtLogin = actualState
                 }
+
+                // Initialize previous retention days
+                previousRetentionDays = historyRetentionDays
             }
             .onChange(of: launchAtLogin) { newValue in
                 // Sync system state with user preference
@@ -217,11 +206,62 @@ struct GeneralSettingsView: View {
                     showErrorAlert = true
                 }
             }
+            .onChange(of: historyRetentionDays) { newValue in
+                // Check if retention time is being shortened (and not set to permanent)
+                if newValue < previousRetentionDays && newValue != -1 {
+                    // Show confirmation dialog
+                    pendingRetentionDays = newValue
+                    showRetentionConfirmation = true
+                    // Temporarily revert to old value
+                    historyRetentionDays = previousRetentionDays
+                } else {
+                    // No confirmation needed for increasing retention or setting to permanent
+                    previousRetentionDays = newValue
+
+                    // Auto-cleanup when changing retention time (except permanent)
+                    if newValue != -1 {
+                        Task {
+                            _ = viewModel.cleanupExpiredItems(retentionDays: newValue)
+                        }
+                    }
+                }
+            }
         }
         .alert("设置失败", isPresented: $showErrorAlert) {
             Button("好的", role: .cancel) {}
         } message: {
             Text(errorMessage)
+        }
+        .alert("缩短保留时间", isPresented: $showRetentionConfirmation) {
+            Button("取消", role: .cancel) {
+                pendingRetentionDays = nil
+            }
+            Button("确认删除", role: .destructive) {
+                if let newDays = pendingRetentionDays {
+                    // Execute cleanup
+                    Task {
+                        deletedItemsCount = viewModel.cleanupExpiredItems(retentionDays: newDays)
+                        historyRetentionDays = newDays
+                        previousRetentionDays = newDays
+                        pendingRetentionDays = nil
+
+                        // Show result if items were deleted
+                        if deletedItemsCount > 0 {
+                            showRetentionResult = true
+                        }
+                    }
+                }
+            }
+        } message: {
+            if let newDays = pendingRetentionDays {
+                let daysText = newDays == 1 ? "1 天" : "\(newDays) 天"
+                Text("缩短保留时间将立即删除超过 \(daysText) 的历史记录（不包括收藏和置顶项目）。此操作不可撤销。")
+            }
+        }
+        .alert("清理完成", isPresented: $showRetentionResult) {
+            Button("好的", role: .cancel) {}
+        } message: {
+            Text("已删除 \(deletedItemsCount) 条过期历史记录")
         }
     }
 }
@@ -345,6 +385,10 @@ struct PrivacySettingsView: View {
 // MARK: - Shortcuts Settings
 
 struct ShortcutsSettingsView: View {
+    @EnvironmentObject var viewModel: ClipboardViewModel
+    @ObservedObject private var hotKeyManager = HotKeyManager.shared
+    @State private var showModifierPicker = false
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -353,41 +397,147 @@ struct ShortcutsSettingsView: View {
                     .fontWeight(.bold)
                     .padding(.bottom, 8)
 
+                // 基础快捷键
+                Text("基础")
+                    .font(.headline)
+
                 SettingsGroupBox {
                     VStack(spacing: 12) {
-                        ShortcutRow(title: "显示 PasteDeck", shortcut: "⌘⇧V")
+                        ShortcutRecorderRow(
+                            title: "显示 PasteDeck",
+                            name: .showClipboard
+                        )
                         Divider()
-                        ShortcutRow(title: "清除历史", shortcut: "⌘⇧⌫")
-                        Divider()
-                        ShortcutRow(title: "搜索剪贴板", shortcut: "⌘⇧F")
+                        ShortcutRecorderRow(
+                            title: "清除历史",
+                            name: .clearHistory
+                        )
                     }
                 }
 
-                Text("提示：点击快捷键可以自定义")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                // 快速粘贴快捷键
+                Text("快速粘贴")
+                    .font(.headline)
+                    .padding(.top, 8)
+
+                SettingsGroupBox {
+                    VStack(spacing: 12) {
+                        HStack {
+                            Text("直接粘贴历史中的第 N 项（无需打开抽屉）")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        Divider()
+
+                        HStack {
+                            Text("快速粘贴")
+                                .frame(width: 150, alignment: .leading)
+                            Spacer()
+                            Button(action: {
+                                showModifierPicker = true
+                            }) {
+                                Text("\(hotKeyManager.quickPasteModifiers.displayString) + 1...9")
+                                    .font(.system(.body, design: .monospaced))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color(nsColor: .controlBackgroundColor))
+                                    .cornerRadius(4)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                HStack {
+                    Spacer()
+                    Button("重置为默认") {
+                        resetAllShortcuts()
+                    }
+                }
 
                 Spacer()
             }
             .padding(24)
         }
+        .sheet(isPresented: $showModifierPicker) {
+            ModifierPickerView(modifiers: $hotKeyManager.quickPasteModifiers)
+        }
+    }
+
+    private func resetAllShortcuts() {
+        KeyboardShortcuts.reset(.showClipboard)
+        KeyboardShortcuts.reset(.clearHistory)
+        hotKeyManager.quickPasteModifiers = .default
     }
 }
 
-struct ShortcutRow: View {
+// MARK: - Modifier Picker View
+
+struct ModifierPickerView: View {
+    @Binding var modifiers: QuickPasteModifiers
+    @Environment(\.dismiss) var dismiss
+    @State private var tempModifiers: QuickPasteModifiers
+
+    init(modifiers: Binding<QuickPasteModifiers>) {
+        self._modifiers = modifiers
+        self._tempModifiers = State(initialValue: modifiers.wrappedValue)
+    }
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("快速粘贴修饰符")
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle("⌘ Command", isOn: $tempModifiers.command)
+                Toggle("⌃ Control", isOn: $tempModifiers.control)
+                Toggle("⌥ Option", isOn: $tempModifiers.option)
+                Toggle("⇧ Shift", isOn: $tempModifiers.shift)
+            }
+            .toggleStyle(.checkbox)
+
+            Text("预览: \(tempModifiers.displayString) + 1...9")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            if !tempModifiers.isValid {
+                Text("至少选择一个修饰符")
+                    .font(.caption)
+                    .foregroundColor(.red)
+            }
+
+            HStack {
+                Button("取消") {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Spacer()
+
+                Button("确定") {
+                    modifiers = tempModifiers
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(!tempModifiers.isValid)
+            }
+        }
+        .padding(24)
+        .frame(width: 300)
+    }
+}
+
+struct ShortcutRecorderRow: View {
     let title: String
-    let shortcut: String
+    let name: KeyboardShortcuts.Name
 
     var body: some View {
         HStack {
             Text(title)
+                .frame(width: 150, alignment: .leading)
             Spacer()
-            Text(shortcut)
-                .font(.system(.body, design: .monospaced))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .cornerRadius(4)
+            KeyboardShortcuts.Recorder(for: name)
         }
     }
 }
