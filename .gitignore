@@ -102,3 +102,17 @@ ApplicationSupport/
 *.dmg.sha256
 *.pkg
 *.zip
+*.tar.gz
+
+# Design files (除了已提交的 Design/PasteDeck.psd)
+*.ai
+*.sketch
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# Xcode user data (if opening SPM with Xcode)
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/

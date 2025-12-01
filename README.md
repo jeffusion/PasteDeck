@@ -96,7 +96,7 @@ PasteDeck 是开源软件，目前使用 ad-hoc 签名分发（无需付费的 A
 
 3. 创建 .app bundle：
    ```bash
-   ./build.sh
+   ./Scripts/build.sh
    ```
    生成的应用位于 `.build/PasteDeck.app`
 
@@ -106,7 +106,7 @@ PasteDeck 是开源软件，目前使用 ad-hoc 签名分发（无需付费的 A
    brew install create-dmg
 
    # 构建 DMG
-   ./build-dmg.sh
+   ./Scripts/build-dmg.sh
    ```
    生成的 DMG 位于 `PasteDeck-1.0.0.dmg`
 
@@ -143,8 +143,14 @@ PasteDeck/
 ├── Tests/
 │   └── PasteDeckTests/
 ├── Resources/                      # App icon and DMG assets
-├── build.sh                        # Build .app bundle
-├── build-dmg.sh                    # Build DMG (calls build.sh)
+├── Scripts/                        # Build and tooling scripts
+│   ├── build.sh                    # Build .app bundle
+│   └── build-dmg.sh                # Build DMG (calls build.sh)
+├── Design/                         # Design source files
+│   └── PasteDeck.psd               # App icon design source
+├── Docs/                           # Documentation
+│   └── Development/
+│       └── DISTRIBUTION.md         # Distribution guide
 ├── Package.swift                   # Swift Package Manager manifest
 └── README.md
 ```
@@ -164,10 +170,10 @@ swift build -c release
 swift test
 
 # 创建 .app bundle
-./build.sh
+./Scripts/build.sh
 
 # 创建 DMG 分发包
-./build-dmg.sh
+./Scripts/build-dmg.sh
 ```
 
 **使用 Xcode (可选)**：
@@ -184,12 +190,12 @@ open PasteDeck.xcodeproj
 
 1. 克隆仓库并进入目录
 2. 运行 `swift build` 确保依赖下载完成
-3. 运行 `./build.sh` 创建应用
+3. 运行 `./Scripts/build.sh` 创建应用
 4. 测试运行：`open .build/PasteDeck.app`
 
 ### 发布新版本
 
-1. 更新版本号（`build.sh` 和 `build-dmg.sh` 中的 `VERSION`）
+1. 更新版本号（`Scripts/build.sh` 和 `Scripts/build-dmg.sh` 中的 `VERSION`）
 2. 创建并推送 Git tag：
    ```bash
    git tag v1.0.0
