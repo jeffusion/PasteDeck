@@ -22,58 +22,22 @@ jobs:
       - name: Install create-dmg
         run: brew install create-dmg
 
-      - name: Build app bundle
-        run: ./Scripts/build.sh
-
-      - name: Copy app icon (if exists)
+      - name: Extract version from tag
         run: |
-          if [ -f "Resources/AppIcon.icns" ]; then
-            cp Resources/AppIcon.icns .build/PasteDeck.app/Contents/Resources/
-            echo "✅ App icon copied"
-          else
-            echo "⚠️ No app icon found, using default"
-          fi
-
-      - name: Sign app (ad-hoc)
-        run: |
-          codesign --force --deep -s - .build/PasteDeck.app
-          echo "✅ App signed with ad-hoc signature"
-
-      - name: Create DMG
-        run: |
-          # Extract version from tag (v1.0.0 -> 1.0.0)
           VERSION=${GITHUB_REF_NAME#v}
-          DMG_NAME="PasteDeck-$VERSION.dmg"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "DMG_NAME=PasteDeck-$VERSION.dmg" >> $GITHUB_ENV
+          echo "Building version: $VERSION"
 
-          # DMG creation options
-          DMG_OPTS=(
-            --volname "PasteDeck"
-            --window-pos 200 120
-            --window-size 660 400
-            --icon-size 100
-            --icon "PasteDeck.app" 160 185
-            --hide-extension "PasteDeck.app"
-            --app-drop-link 500 185
-          )
+      - name: Build DMG
+        run: make dmg
+        env:
+          VERSION: ${{ env.VERSION }}
 
-          # Add background if available
-          if [ -f "Resources/dmg-background.png" ]; then
-            DMG_OPTS+=(--background "Resources/dmg-background.png")
-          fi
-
-          # Add volume icon if available
-          if [ -f "Resources/AppIcon.icns" ]; then
-            DMG_OPTS+=(--volicon "Resources/AppIcon.icns")
-          fi
-
-          # Create DMG
-          create-dmg "${DMG_OPTS[@]}" "$DMG_NAME" ".build/PasteDeck.app"
-
-          echo "DMG_NAME=$DMG_NAME" >> $GITHUB_ENV
-
-      - name: Calculate SHA256
+      - name: Verify build artifacts
         run: |
-          shasum -a 256 "$DMG_NAME" > "$DMG_NAME.sha256"
+          ls -lh "$DMG_NAME"
+          ls -lh "$DMG_NAME.sha256"
           cat "$DMG_NAME.sha256"
 
       - name: Create Release

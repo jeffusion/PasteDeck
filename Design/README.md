@@ -36,7 +36,7 @@
    # 清理临时文件
    rm -rf AppIcon.iconset
    ```
-4. 重新构建应用：`./Scripts/build-dmg.sh`
+4. 重新构建应用：`make dmg`
 
 ## 设计规范
 
