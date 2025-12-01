@@ -96,3 +96,9 @@ iOSInjectionProject/
 # App specific
 ApplicationSupport/
 *.log
+
+# Distribution
+*.dmg
+*.dmg.sha256
+*.pkg
+*.zip
