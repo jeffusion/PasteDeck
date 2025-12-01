@@ -14,13 +14,12 @@ PasteDeck 现已配置为通过 DMG 文件分发，无需 Apple Developer Accoun
    - 状态：已创建，包含说明文档
    - 待办：添加实际的 `AppIcon.icns` 文件（参见 `Resources/README.md`）
 
-2. **构建脚本**
-   - `build.sh`：构建 .app bundle（无签名）
-   - `build-dmg.sh`：完整的 DMG 构建流程
-     - 调用 `build.sh` 构建应用
-     - 复制图标资源（如果存在）
-     - Ad-hoc 签名
-     - 使用 create-dmg 生成 DMG
+2. **构建系统**
+   - `Makefile`：统一的构建系统
+     - `make app`：构建 .app bundle
+     - `make sign`：Ad-hoc 签名
+     - `make dmg`：完整的 DMG 构建流程
+     - 版本号从 `VERSION` 文件读取
 
 3. **GitHub Actions 自动发布**
    - 位置：`.github/workflows/release.yml`
@@ -65,7 +64,7 @@ brew install create-dmg
 ### 3. 测试 DMG 构建
 
 ```bash
-./build-dmg.sh
+make dmg
 ```
 
 预期输出：

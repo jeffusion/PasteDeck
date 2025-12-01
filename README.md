@@ -96,7 +96,7 @@ PasteDeck 是开源软件，目前使用 ad-hoc 签名分发（无需付费的 A
 
 3. 创建 .app bundle：
    ```bash
-   ./Scripts/build.sh
+   make app
    ```
    生成的应用位于 `.build/PasteDeck.app`
 
@@ -106,7 +106,7 @@ PasteDeck 是开源软件，目前使用 ad-hoc 签名分发（无需付费的 A
    brew install create-dmg
 
    # 构建 DMG
-   ./Scripts/build-dmg.sh
+   make dmg
    ```
    生成的 DMG 位于 `PasteDeck-1.0.0.dmg`
 
@@ -143,21 +143,42 @@ PasteDeck/
 ├── Tests/
 │   └── PasteDeckTests/
 ├── Resources/                      # App icon and DMG assets
-├── Scripts/                        # Build and tooling scripts
-│   ├── build.sh                    # Build .app bundle
-│   └── build-dmg.sh                # Build DMG (calls build.sh)
 ├── Design/                         # Design source files
 │   └── PasteDeck.psd               # App icon design source
 ├── Docs/                           # Documentation
 │   └── Development/
 │       └── DISTRIBUTION.md         # Distribution guide
+├── Makefile                        # Build system
+├── VERSION                         # Version number (single source of truth)
 ├── Package.swift                   # Swift Package Manager manifest
 └── README.md
 ```
 
 ### 构建项目
 
-**使用 Swift Package Manager (推荐)**：
+**使用 Makefile (推荐)**：
+
+```bash
+# 查看所有可用命令
+make help
+
+# 创建 .app bundle
+make app
+
+# 创建 DMG 分发包
+make dmg
+
+# 运行测试
+make test
+
+# 安装到 /Applications
+make install
+
+# 清理构建产物
+make clean
+```
+
+**使用 Swift Package Manager**：
 
 ```bash
 # 调试构建
@@ -168,12 +189,6 @@ swift build -c release
 
 # 运行测试
 swift test
-
-# 创建 .app bundle
-./Scripts/build.sh
-
-# 创建 DMG 分发包
-./Scripts/build-dmg.sh
 ```
 
 **使用 Xcode (可选)**：
@@ -190,16 +205,21 @@ open PasteDeck.xcodeproj
 
 1. 克隆仓库并进入目录
 2. 运行 `swift build` 确保依赖下载完成
-3. 运行 `./Scripts/build.sh` 创建应用
-4. 测试运行：`open .build/PasteDeck.app`
+3. 运行 `make app` 创建应用
+4. 测试运行：`make run`
 
 ### 发布新版本
 
-1. 更新版本号（`Scripts/build.sh` 和 `Scripts/build-dmg.sh` 中的 `VERSION`）
+1. 更新版本号（编辑 `VERSION` 文件）
+   ```bash
+   echo "1.0.1" > VERSION
+   ```
 2. 创建并推送 Git tag：
    ```bash
-   git tag v1.0.0
-   git push origin v1.0.0
+   git add VERSION
+   git commit -m "chore: bump version to 1.0.1"
+   git tag v1.0.1
+   git push origin v1.0.1
    ```
 3. GitHub Actions 会自动构建并发布 DMG 到 Releases
 
