@@ -10,6 +10,7 @@ import Cocoa
 import SwiftUI
 import Combine
 import KeyboardShortcuts
+import CoreGraphics
 
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -362,20 +363,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Add global event monitor for ESC key (works even when focus is in other app)
         globalKeyEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             if event.keyCode == 53 { // ESC key
-                self?.hideClipboardWindow()
+                DispatchQueue.main.async {
+                    self?.hideClipboardWindow()
+                }
             }
         }
 
         // Add global event monitor for clicks outside drawer
         globalMouseEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            guard let self = self, self.clipboardWindow.isVisible else { return }
+            guard let self = self else { return }
+            guard self.clipboardWindow.isVisible else { return }
 
             // Check if click is outside the drawer window
             let windowFrame = self.clipboardWindow.frame
             let screenPoint = NSEvent.mouseLocation
 
             if !windowFrame.contains(screenPoint) {
-                self.hideClipboardWindow()
+                DispatchQueue.main.async {
+                    self.hideClipboardWindow()
+                }
             }
         }
 
@@ -402,6 +408,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func hideClipboardWindow() {
         guard clipboardWindow.isVisible else { return }
 
+        let restoreSettingsFocus = shouldRestoreSettingsFocusAfterDrawerClose()
+
         // Remove event monitors
         if let monitor = globalKeyEventMonitor {
             NSEvent.removeMonitor(monitor)
@@ -414,6 +422,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let fullFrame = NSScreen.main?.frame ?? .zero
         let drawerHeight: CGFloat = 280
+
+        clipboardWindow.resignKey()
 
         // Get the visual effect view
         guard let clippingContainer = clipboardWindow.contentView,
@@ -445,7 +455,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self.clipboardWindow.level = .popUpMenu
             // Reset UI state to ensure clean state on next open
             self.clipboardViewModel.resetUIState()
+            if restoreSettingsFocus {
+                self.settingsWindow?.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+            }
         })
+    }
+
+    private func shouldRestoreSettingsFocusAfterDrawerClose() -> Bool {
+        guard let settingsWindow, settingsWindow.isVisible else { return false }
+        if NSWorkspace.shared.frontmostApplication?.bundleIdentifier == Bundle.main.bundleIdentifier {
+            return true
+        }
+        return NSApp.isActive
     }
 
     @objc private func toggleClipboardWindow() {
@@ -466,13 +488,156 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             window.title = "设置"
             window.styleMask = [.titled, .closable, .miniaturizable]
             window.setContentSize(NSSize(width: 650, height: 500))
-            window.center()
             window.isReleasedWhenClosed = false
             settingsWindow = window
         }
 
+        if let window = settingsWindow {
+            positionSettingsWindow(window)
+        }
+
         settingsWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func positionSettingsWindow(_ window: NSWindow) {
+        guard let targetScreen = preferredSettingsScreen() else { return }
+
+        let visibleFrame = targetScreen.visibleFrame
+        let windowSize = window.frame.size
+        let origin = NSPoint(
+            x: visibleFrame.origin.x + (visibleFrame.width - windowSize.width) / 2,
+            y: visibleFrame.origin.y + (visibleFrame.height - windowSize.height) / 2
+        )
+        window.setFrameOrigin(origin)
+    }
+
+    private func preferredSettingsScreen() -> NSScreen? {
+        let screens = NSScreen.screens
+        guard !screens.isEmpty else { return nil }
+
+        let frontmostAppScreenIndex = frontmostApplicationScreenIndex(in: screens)
+        let keyWindowScreenIndex = screenIndex(
+            for: NSApp.keyWindow?.screen ?? NSApp.mainWindow?.screen,
+            in: screens
+        )
+        let mouseScreenIndex = screenIndexForMouseLocation(in: screens)
+        let mainScreenIndex = screenIndex(for: NSScreen.main, in: screens) ?? 0
+
+        guard let preferredIndex = ScreenSelection.preferredScreenIndex(
+            frontmostAppScreenIndex: frontmostAppScreenIndex,
+            keyWindowScreenIndex: keyWindowScreenIndex,
+            mouseScreenIndex: mouseScreenIndex,
+            mainScreenIndex: mainScreenIndex
+        ) else {
+            return nil
+        }
+
+        guard screens.indices.contains(preferredIndex) else { return nil }
+        return screens[preferredIndex]
+    }
+
+    private func frontmostApplicationScreenIndex(in screens: [NSScreen]) -> Int? {
+        guard let frontApp = NSWorkspace.shared.frontmostApplication else { return nil }
+        if frontApp.bundleIdentifier == Bundle.main.bundleIdentifier {
+            return nil
+        }
+        return screenIndexForRunningApplication(frontApp, in: screens)
+    }
+
+    private func screenIndexForRunningApplication(_ app: NSRunningApplication, in screens: [NSScreen]) -> Int? {
+        let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+        guard let windowInfoList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
+            return nil
+        }
+
+        let screenFrames = screens.map { $0.frame }
+        let targetPID = app.processIdentifier
+
+        for info in windowInfoList {
+            guard let ownerPID = info[kCGWindowOwnerPID as String] as? pid_t, ownerPID == targetPID else {
+                continue
+            }
+
+            let layer = intValue(info[kCGWindowLayer as String]) ?? 0
+            if layer != 0 {
+                continue
+            }
+
+            if let isOnscreenValue = info[kCGWindowIsOnscreen as String],
+               let isOnscreen = boolValue(isOnscreenValue),
+               !isOnscreen {
+                continue
+            }
+
+            guard let bounds = boundsRect(info[kCGWindowBounds as String]) else {
+                continue
+            }
+
+            if let index = ScreenSelection.screenIndexForWindowBounds(bounds, in: screenFrames) {
+                return index
+            }
+        }
+
+        return nil
+    }
+
+    private func screenIndexForMouseLocation(in screens: [NSScreen]) -> Int? {
+        let mousePoint = NSEvent.mouseLocation
+        return screens.firstIndex(where: { $0.frame.contains(mousePoint) })
+    }
+
+    private func screenIndex(for screen: NSScreen?, in screens: [NSScreen]) -> Int? {
+        guard let screen else { return nil }
+        return screens.firstIndex(where: { $0 === screen })
+    }
+
+    private func boundsRect(_ value: Any?) -> CGRect? {
+        guard let dict = value as? [String: Any],
+              let x = cgFloatValue(dict["X"]),
+              let y = cgFloatValue(dict["Y"]),
+              let width = cgFloatValue(dict["Width"]),
+              let height = cgFloatValue(dict["Height"]) else {
+            return nil
+        }
+
+        return CGRect(x: x, y: y, width: width, height: height)
+    }
+
+    private func cgFloatValue(_ value: Any?) -> CGFloat? {
+        if let value = value as? CGFloat {
+            return value
+        }
+        if let value = value as? Double {
+            return CGFloat(value)
+        }
+        if let value = value as? Int {
+            return CGFloat(value)
+        }
+        if let value = value as? NSNumber {
+            return CGFloat(truncating: value)
+        }
+        return nil
+    }
+
+    private func intValue(_ value: Any?) -> Int? {
+        if let value = value as? Int {
+            return value
+        }
+        if let value = value as? NSNumber {
+            return value.intValue
+        }
+        return nil
+    }
+
+    private func boolValue(_ value: Any?) -> Bool? {
+        if let value = value as? Bool {
+            return value
+        }
+        if let value = value as? NSNumber {
+            return value.boolValue
+        }
+        return nil
     }
 
     @objc private func showAbout() {
