@@ -157,9 +157,6 @@ struct ClipCardView: View {
         case .image(let data, _):
             imagePreview(data)
 
-        case .url(let url):
-            urlPreview(url)
-
         case .file(let url):
             filePreview(url)
 
@@ -196,22 +193,6 @@ struct ClipCardView: View {
                 iconPlaceholder("photo")
             }
         }
-    }
-
-    private func urlPreview(_ url: URL) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: "link")
-                .font(.system(size: 24))
-                .foregroundColor(.accentColor)
-
-            Text(url.host ?? url.absoluteString)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(8)
     }
 
     private func filePreview(_ url: URL) -> some View {
@@ -421,7 +402,7 @@ struct ClipCardView_Previews: PreviewProvider {
 
             ClipCardView(
                 item: ClipItem(
-                    content: .url(URL(string: "https://github.com")!),
+                    content: .text("https://github.com", isRTF: false),
                     sourceApp: "Safari",
                     isFavorite: true
                 ),

@@ -200,7 +200,7 @@ class PersistenceController {
         attributes.append(excludeFromSyncAttr)
 
         // Content storage (simplified approach)
-        // contentType: String (text, image, url, file, color)
+        // contentType: String (text, image, file, color)
         let contentTypeAttr = NSAttributeDescription()
         contentTypeAttr.name = "contentType"
         contentTypeAttr.attributeType = .stringAttributeType
@@ -235,13 +235,6 @@ class PersistenceController {
         imageFormatAttr.attributeType = .stringAttributeType
         imageFormatAttr.isOptional = true
         attributes.append(imageFormatAttr)
-
-        // urlString: String?
-        let urlStringAttr = NSAttributeDescription()
-        urlStringAttr.name = "urlString"
-        urlStringAttr.attributeType = .stringAttributeType
-        urlStringAttr.isOptional = true
-        attributes.append(urlStringAttr)
 
         // filePaths: Transformable ([String])
         let filePathsAttr = NSAttributeDescription()

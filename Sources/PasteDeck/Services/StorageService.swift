@@ -370,8 +370,6 @@ class StorageService: ObservableObject {
         switch content {
         case .text(let text, _):
             request.predicate = NSPredicate(format: "contentType == 'text' AND textContent == %@", text)
-        case .url(let url):
-            request.predicate = NSPredicate(format: "contentType == 'url' AND urlString == %@", url.absoluteString)
         default:
             // For other types, we don't deduplicate by default
             return nil
@@ -401,7 +399,6 @@ extension StorageService {
         let pinnedItems: Int
         let textItems: Int
         let imageItems: Int
-        let urlItems: Int
         let fileItems: Int
         let colorItems: Int
     }
@@ -422,9 +419,6 @@ extension StorageService {
         let imageRequest = ClipItemEntity.fetchRequest()
         imageRequest.predicate = NSPredicate(format: "contentType == 'image'")
 
-        let urlRequest = ClipItemEntity.fetchRequest()
-        urlRequest.predicate = NSPredicate(format: "contentType == 'url'")
-
         let fileRequest = ClipItemEntity.fetchRequest()
         fileRequest.predicate = NSPredicate(format: "contentType == 'file'")
 
@@ -438,7 +432,6 @@ extension StorageService {
                 pinnedItems: try context.count(for: pinnedRequest),
                 textItems: try context.count(for: textRequest),
                 imageItems: try context.count(for: imageRequest),
-                urlItems: try context.count(for: urlRequest),
                 fileItems: try context.count(for: fileRequest),
                 colorItems: try context.count(for: colorRequest)
             )
@@ -449,7 +442,6 @@ extension StorageService {
                 pinnedItems: 0,
                 textItems: 0,
                 imageItems: 0,
-                urlItems: 0,
                 fileItems: 0,
                 colorItems: 0
             )
