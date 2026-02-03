@@ -204,24 +204,73 @@ open PasteDeck.xcodeproj
 ### 首次设置
 
 1. 克隆仓库并进入目录
-2. 运行 `swift build` 确保依赖下载完成
-3. 运行 `make app` 创建应用
-4. 测试运行：`make run`
+2. 安装 Git hooks（强制 Conventional Commits 规范）：
+   ```bash
+   ./.githooks/install.sh
+   ```
+3. （可选）安装 commitizen 辅助工具：
+   ```bash
+   # 使用 pipx 安装（推荐）
+   brew install pipx
+   pipx install commitizen
+
+   # 或使用 pip
+   pip install commitizen
+   ```
+4. 运行 `swift build` 确保依赖下载完成
+5. 运行 `make app` 创建应用
+6. 测试运行：`make run`
 
 ### 发布新版本
 
-1. 更新版本号（编辑 `VERSION` 文件）
+项目使用 **release-please** 自动化版本管理，基于 Conventional Commits 自动生成版本号和变更日志。
+
+**自动化发布流程**:
+
+1. **日常开发**：使用规范的提交格式
    ```bash
-   echo "1.0.1" > VERSION
+   # 使用 commitizen 辅助工具（推荐）
+   cz commit
+
+   # 或手动编写 Conventional Commits
+   git commit -m "feat(ui): 添加深色模式支持"
+   git commit -m "fix(clipboard): 修复内存泄漏问题"
    ```
-2. 创建并推送 Git tag：
+
+2. **推送到 main 分支**
    ```bash
-   git add VERSION
-   git commit -m "chore: bump version to 1.0.1"
-   git tag v1.0.1
-   git push origin v1.0.1
+   git push origin main
    ```
-3. GitHub Actions 会自动构建并发布 DMG 到 Releases
+
+3. **release-please 自动创建 Release PR**
+   - 自动分析提交历史
+   - 根据 feat/fix/BREAKING CHANGE 确定版本号
+   - 生成 CHANGELOG.md
+   - 更新 VERSION 文件
+
+4. **审查并合并 Release PR**
+   - 检查 CHANGELOG 内容是否正确
+   - 确认版本号符合预期
+   - 合并 PR
+
+5. **自动发布**
+   - 自动创建 Git tag（如 v1.1.0）
+   - 自动构建 DMG 文件
+   - 自动创建 GitHub Release
+   - 自动上传 DMG 和 SHA256 校验文件
+
+**版本号规则** (Semantic Versioning):
+- `feat`: 新功能 → MINOR 版本 (1.0.0 → 1.1.0)
+- `fix`: Bug 修复 → PATCH 版本 (1.0.0 → 1.0.1)
+- `BREAKING CHANGE`: 不兼容更改 → MAJOR 版本 (1.0.0 → 2.0.0)
+
+**Breaking Change 示例**:
+```bash
+git commit -m "feat(api)!: 移除旧版剪贴板 API
+
+BREAKING CHANGE: ClipboardManager.legacy() 已被移除，
+请使用 ClipboardManager.modern() 替代"
+```
 
 ## Usage
 

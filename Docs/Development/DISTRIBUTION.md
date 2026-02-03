@@ -21,18 +21,24 @@ PasteDeck 现已配置为通过 DMG 文件分发，无需 Apple Developer Accoun
      - `make dmg`：完整的 DMG 构建流程
      - 版本号从 `VERSION` 文件读取
 
-3. **GitHub Actions 自动发布**
-   - 位置：`.github/workflows/release.yml`
-   - 触发：推送版本标签（如 `v1.0.0`）
+3. **自动化版本管理（release-please）**
+   - 配置文件：
+     - `.release-please-manifest.json`: 版本清单
+     - `release-please-config.json`: 详细配置
+   - Workflow: `.github/workflows/release-please.yml`
+   - 触发：推送到 main 分支
    - 功能：
-     - 自动构建应用
-     - 签名（ad-hoc）
-     - 生成 DMG
-     - 计算 SHA256 校验和
-     - 创建 GitHub Release
-     - 上传 DMG 文件
+     - 分析 Conventional Commits 自动确定版本号
+     - 自动生成/更新 CHANGELOG.md
+     - 创建 Release PR 供人工审查
+     - 合并 PR 后自动构建 DMG 并发布
 
-4. **README.md 更新**
+4. **提交规范工具**
+   - commitizen: 交互式创建 Conventional Commits
+   - Git hooks: 强制验证提交信息格式
+   - 安装脚本：`.githooks/install.sh`
+
+5. **README.md 更新**
    - 添加详细的 DMG 安装说明
    - macOS Sequoia 专用的安装步骤
    - 解释为什么需要手动批准
@@ -81,25 +87,48 @@ make dmg
 3. 测试首次运行和系统批准流程
 4. 确认所有功能正常工作
 
-### 5. 发布到 GitHub
+### 5. 发布到 GitHub（自动化流程）
 
-```bash
-# 确保所有改动已提交
-git add .
-git commit -m "feat(distribution): 添加 DMG 分发支持"
+**日常开发流程**:
 
-# 创建版本标签
-git tag v1.0.0
+1. **使用 Conventional Commits 格式提交**
+   ```bash
+   # 推荐：使用 commitizen 辅助工具
+   cz commit
 
-# 推送到远程仓库
-git push origin main
-git push origin v1.0.0
-```
+   # 或手动编写规范提交
+   git commit -m "feat(ui): 添加深色模式支持"
+   git commit -m "fix(clipboard): 修复内存泄漏"
+   ```
 
-GitHub Actions 会自动：
-- 构建应用
-- 创建 DMG
-- 发布到 Releases 页面
+2. **推送到 main 分支**
+   ```bash
+   git push origin main
+   ```
+
+3. **release-please 自动化**
+   - 自动分析提交历史
+   - 自动创建/更新 Release PR
+   - PR 包含：
+     - 更新的 VERSION 文件
+     - 生成的 CHANGELOG.md
+     - 计算的新版本号
+
+4. **审查并合并 Release PR**
+   - 检查 CHANGELOG 准确性
+   - 确认版本号符合预期
+   - 合并 PR
+
+5. **自动发布**
+   - 创建 Git tag (如 v1.1.0)
+   - 构建签名的 .app 和 DMG
+   - 创建 GitHub Release
+   - 上传 DMG 和 SHA256 文件
+
+**版本号自动计算规则**:
+- `feat:` → MINOR 版本递增 (1.0.0 → 1.1.0)
+- `fix:` → PATCH 版本递增 (1.0.0 → 1.0.1)
+- `BREAKING CHANGE:` → MAJOR 版本递增 (1.0.0 → 2.0.0)
 
 ## 分发选项对比
 

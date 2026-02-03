@@ -1,0 +1,51 @@
+#!/bin/sh
+# Conventional Commits 提交信息验证 hook
+# 确保提交信息符合规范格式
+
+commit_msg_file="$1"
+commit_msg=$(cat "$commit_msg_file")
+
+# Conventional Commits 格式：type(scope): subject
+# type: feat, fix, docs, style, refactor, perf, test, chore
+# scope: 可选，表示影响范围
+# subject: 简短描述
+
+pattern="^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(\([a-z0-9-]+\))?!?: .{1,100}$"
+
+if ! echo "$commit_msg" | head -n 1 | grep -qE "$pattern"; then
+    echo "❌ 提交信息不符合 Conventional Commits 规范！"
+    echo ""
+    echo "格式要求："
+    echo "  <type>(<scope>): <subject>"
+    echo ""
+    echo "有效的 type："
+    echo "  feat:      新功能"
+    echo "  fix:       Bug 修复"
+    echo "  docs:      文档更新"
+    echo "  style:     代码格式（不影响代码逻辑）"
+    echo "  refactor:  代码重构"
+    echo "  perf:      性能优化"
+    echo "  test:      测试相关"
+    echo "  chore:     构建/工具链相关"
+    echo "  build:     构建系统或依赖更新"
+    echo "  ci:        CI 配置文件和脚本"
+    echo "  revert:    回退之前的提交"
+    echo ""
+    echo "示例："
+    echo "  feat(ui): 添加深色模式支持"
+    echo "  fix(clipboard): 修复粘贴板监控内存泄漏"
+    echo "  docs: 更新 README 安装说明"
+    echo "  refactor(build): 迁移到 Makefile 构建系统"
+    echo ""
+    echo "Breaking Changes（不兼容的更改）："
+    echo "  feat(api)!: 移除旧版 API"
+    echo ""
+    echo "💡 建议使用 commitizen 工具辅助创建规范提交："
+    echo "   pipx install commitizen"
+    echo "   cz commit"
+    echo ""
+    exit 1
+fi
+
+echo "✅ 提交信息格式正确"
+exit 0
