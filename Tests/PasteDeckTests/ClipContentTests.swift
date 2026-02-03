@@ -25,15 +25,6 @@ final class ClipContentTests: XCTestCase {
         XCTAssertEqual(content.iconName, "doc.richtext")
     }
 
-    func testURLContent() {
-        let url = URL(string: "https://github.com")!
-        let content = ClipContent.url(url)
-
-        XCTAssertEqual(content.typeName, "URL")
-        XCTAssertEqual(content.previewString, "https://github.com")
-        XCTAssertEqual(content.iconName, "link")
-    }
-
     func testFileContent() {
         let url = URL(fileURLWithPath: "/Users/test/file.txt")
         let content = ClipContent.file(url)
@@ -103,8 +94,8 @@ final class ClipContentTests: XCTestCase {
         let textContent = ClipContent.text("Hello", isRTF: false)
         XCTAssertGreaterThan(textContent.estimatedSize, 0)
 
-        let urlContent = ClipContent.url(URL(string: "https://github.com")!)
-        XCTAssertGreaterThan(urlContent.estimatedSize, 0)
+        let fileContent = ClipContent.file(URL(fileURLWithPath: "/Users/test/file.txt"))
+        XCTAssertGreaterThan(fileContent.estimatedSize, 0)
     }
 
     func testContentEquality() {

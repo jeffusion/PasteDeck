@@ -94,9 +94,6 @@ struct ClipItem: Identifiable, Codable, Equatable, Hashable {
         case .image:
             return "Image"
 
-        case .url(let url):
-            return url.host ?? url.absoluteString
-
         case .file(let url):
             return url.lastPathComponent
 
@@ -283,11 +280,6 @@ extension ClipItem {
                 return true
             }
 
-        case .url(let url):
-            if url.absoluteString.lowercased().contains(lowercaseQuery) {
-                return true
-            }
-
         case .file(let url):
             if url.lastPathComponent.lowercased().contains(lowercaseQuery) {
                 return true
@@ -331,7 +323,6 @@ extension ClipItem {
         case all = "All"
         case text = "Text"
         case images = "Images"
-        case links = "Links"
         case files = "Files"
         case colors = "Colors"
 
@@ -340,7 +331,6 @@ extension ClipItem {
             case .all: return "square.grid.2x2"
             case .text: return "doc.text"
             case .images: return "photo"
-            case .links: return "link"
             case .files: return "doc"
             case .colors: return "paintpalette"
             }
@@ -351,7 +341,6 @@ extension ClipItem {
             case .all: return "全部"
             case .text: return "文本"
             case .images: return "图片"
-            case .links: return "链接"
             case .files: return "文件"
             case .colors: return "颜色"
             }
@@ -362,7 +351,6 @@ extension ClipItem {
             case .all: return .gray
             case .text: return .blue
             case .images: return .purple
-            case .links: return .green
             case .files: return .orange
             case .colors: return .pink
             }
@@ -375,8 +363,6 @@ extension ClipItem {
             case (.text, .text):
                 return true
             case (.images, .image):
-                return true
-            case (.links, .url):
                 return true
             case (.files, .file), (.files, .multipleFiles):
                 return true

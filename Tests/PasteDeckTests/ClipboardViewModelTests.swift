@@ -213,9 +213,9 @@ final class ClipboardViewModelTests: XCTestCase {
 
     func testContentFilter() {
         let textItem = ClipItem(content: .text("Text", isRTF: false))
-        let urlItem = ClipItem(content: .url(URL(string: "https://test.com")!))
+        let fileItem = ClipItem(content: .file(URL(fileURLWithPath: "/Users/test/file.txt")))
 
-        viewModel.items = [textItem, urlItem]
+        viewModel.items = [textItem, fileItem]
         viewModel.contentFilter = .text
 
         // Give time for debounce

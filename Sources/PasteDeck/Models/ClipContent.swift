@@ -13,7 +13,6 @@ import AppKit
 enum ClipContent: Codable, Equatable {
     case text(String, isRTF: Bool)
     case image(Data, format: ImageFormat)
-    case url(URL)
     case file(URL)
     case multipleFiles([URL])
     case color(ColorInfo)
@@ -82,8 +81,6 @@ enum ClipContent: Codable, Equatable {
             return isRTF ? "Rich Text" : "Text"
         case .image:
             return "Image"
-        case .url:
-            return "URL"
         case .file:
             return "File"
         case .multipleFiles:
@@ -103,9 +100,6 @@ enum ClipContent: Codable, Equatable {
 
         case .image(_, let format):
             return "Image (\(format.rawValue.uppercased()))"
-
-        case .url(let url):
-            return url.absoluteString
 
         case .file(let url):
             return url.lastPathComponent
@@ -129,8 +123,6 @@ enum ClipContent: Codable, Equatable {
             return string.utf8.count
         case .image(let data, _):
             return data.count
-        case .url(let url):
-            return url.absoluteString.utf8.count
         case .file(let url):
             return url.path.utf8.count
         case .multipleFiles(let urls):
@@ -147,8 +139,6 @@ enum ClipContent: Codable, Equatable {
             return isRTF ? "doc.richtext" : "doc.text"
         case .image:
             return "photo"
-        case .url:
-            return "link"
         case .file:
             return "doc"
         case .multipleFiles:
@@ -239,12 +229,6 @@ enum ClipContent: Codable, Equatable {
         case .image:
             return imageDimensions ?? ""
 
-        case .url(let url):
-            if let host = url.host {
-                return host
-            }
-            return url.absoluteString
-
         case .file, .multipleFiles:
             var parts: [String] = []
 
@@ -276,7 +260,6 @@ enum ClipContent: Codable, Equatable {
         case isRTF
         case imageData
         case imageFormat
-        case urlString
         case filePath
         case filePaths
         case colorInfo
@@ -296,17 +279,6 @@ enum ClipContent: Codable, Equatable {
             let data = try container.decode(Data.self, forKey: .imageData)
             let format = try container.decode(ImageFormat.self, forKey: .imageFormat)
             self = .image(data, format: format)
-
-        case "url":
-            let urlString = try container.decode(String.self, forKey: .urlString)
-            guard let url = URL(string: urlString) else {
-                throw DecodingError.dataCorruptedError(
-                    forKey: .urlString,
-                    in: container,
-                    debugDescription: "Invalid URL string"
-                )
-            }
-            self = .url(url)
 
         case "file":
             let filePath = try container.decode(String.self, forKey: .filePath)
@@ -343,10 +315,6 @@ enum ClipContent: Codable, Equatable {
             try container.encode(data, forKey: .imageData)
             try container.encode(format, forKey: .imageFormat)
 
-        case .url(let url):
-            try container.encode("url", forKey: .type)
-            try container.encode(url.absoluteString, forKey: .urlString)
-
         case .file(let url):
             try container.encode("file", forKey: .type)
             try container.encode(url.path, forKey: .filePath)
@@ -367,7 +335,7 @@ enum ClipContent: Codable, Equatable {
 extension ClipContent {
     /// Determines the appropriate ClipContent from NSPasteboard types
     static func from(pasteboard: NSPasteboard) -> ClipContent? {
-        // Priority order: Color → Image → File → URL → Text
+        // Priority order: Color → Image → File → Rich Text → Text
 
         // Check for color
         if let colorData = pasteboard.data(forType: .color),
@@ -403,12 +371,6 @@ extension ClipContent {
             }
         }
 
-        // Check for URL
-        if let urlString = pasteboard.string(forType: .URL),
-           let url = URL(string: urlString) {
-            return .url(url)
-        }
-
         // Check for rich text
         if let rtfData = pasteboard.data(forType: .rtf),
            let attributedString = NSAttributedString(rtf: rtfData, documentAttributes: nil) {
@@ -417,11 +379,12 @@ extension ClipContent {
 
         // Check for plain text
         if let string = pasteboard.string(forType: .string), !string.isEmpty {
-            // Check if it's a URL that wasn't captured earlier
-            if let url = URL(string: string), url.scheme != nil {
-                return .url(url)
-            }
             return .text(string, isRTF: false)
+        }
+
+        // Fallback: treat URL pasteboard type as plain text (no link classification)
+        if let urlString = pasteboard.string(forType: .URL), !urlString.isEmpty {
+            return .text(urlString, isRTF: false)
         }
 
         return nil
@@ -445,10 +408,6 @@ extension ClipContent {
             if let image = NSImage(data: data) {
                 pasteboard.writeObjects([image])
             }
-
-        case .url(let url):
-            pasteboard.setString(url.absoluteString, forType: .URL)
-            pasteboard.setString(url.absoluteString, forType: .string)
 
         case .file(let url):
             pasteboard.writeObjects([url as NSURL])

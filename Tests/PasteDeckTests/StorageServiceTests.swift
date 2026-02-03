@@ -53,9 +53,9 @@ final class StorageServiceTests: XCTestCase {
         XCTAssertEqual(storageService.count(), 3)
     }
 
-    func testSaveURLContent() {
-        let url = URL(string: "https://github.com")!
-        let item = ClipItem(content: .url(url))
+    func testSaveFileContent() {
+        let fileURL = URL(fileURLWithPath: "/Users/test/file.txt")
+        let item = ClipItem(content: .file(fileURL))
 
         let result = storageService.save(item)
         let fetched = storageService.fetch(id: item.id)
@@ -63,8 +63,8 @@ final class StorageServiceTests: XCTestCase {
         XCTAssertTrue(result)
         XCTAssertNotNil(fetched)
 
-        if case .url(let fetchedURL) = fetched?.content {
-            XCTAssertEqual(fetchedURL, url)
+        if case .file(let fetchedURL) = fetched?.content {
+            XCTAssertEqual(fetchedURL, fileURL)
         } else {
             XCTFail("Content type mismatch")
         }
@@ -264,7 +264,7 @@ final class StorageServiceTests: XCTestCase {
     func testGetStatistics() {
         // Create diverse items
         storageService.save(ClipItem(content: .text("Text", isRTF: false)))
-        storageService.save(ClipItem(content: .url(URL(string: "https://test.com")!)))
+        storageService.save(ClipItem(content: .file(URL(fileURLWithPath: "/Users/test/file.txt"))))
 
         var favorite = ClipItem(content: .text("Favorite", isRTF: false))
         favorite.isFavorite = true
@@ -275,6 +275,6 @@ final class StorageServiceTests: XCTestCase {
         XCTAssertEqual(stats.totalItems, 3)
         XCTAssertEqual(stats.favoriteItems, 1)
         XCTAssertEqual(stats.textItems, 2)
-        XCTAssertEqual(stats.urlItems, 1)
+        XCTAssertEqual(stats.fileItems, 1)
     }
 }

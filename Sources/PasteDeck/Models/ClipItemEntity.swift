@@ -33,7 +33,6 @@ public class ClipItemEntity: NSManagedObject {
     @NSManaged public var isRTF: Bool
     @NSManaged public var imageData: Data?
     @NSManaged public var imageFormat: String?
-    @NSManaged public var urlString: String?
     @NSManaged public var filePaths: [String]?
     @NSManaged public var colorRed: Double
     @NSManaged public var colorGreen: Double
@@ -70,8 +69,8 @@ extension ClipItemEntity {
     @nonobjc public class func searchFetchRequest(query: String) -> NSFetchRequest<ClipItemEntity> {
         let request = allItemsFetchRequest()
         request.predicate = NSPredicate(
-            format: "textContent CONTAINS[cd] %@ OR urlString CONTAINS[cd] %@ OR note CONTAINS[cd] %@",
-            query, query, query
+            format: "textContent CONTAINS[cd] %@ OR note CONTAINS[cd] %@",
+            query, query
         )
         return request
     }
@@ -111,10 +110,6 @@ extension ClipItemEntity {
             guard let data = imageData else { return nil }
             let format = ClipContent.ImageFormat(rawValue: imageFormat ?? "unknown") ?? .unknown
             return .image(data, format: format)
-
-        case "url":
-            guard let urlStr = urlString, let url = URL(string: urlStr) else { return nil }
-            return .url(url)
 
         case "file":
             guard let paths = filePaths, let firstPath = paths.first else { return nil }
@@ -167,7 +162,6 @@ extension ClipItemEntity {
         isRTF = false
         imageData = nil
         imageFormat = nil
-        urlString = nil
         filePaths = nil
         colorRed = 0
         colorGreen = 0
@@ -184,10 +178,6 @@ extension ClipItemEntity {
             contentType = "image"
             imageData = data
             imageFormat = format.rawValue
-
-        case .url(let url):
-            contentType = "url"
-            urlString = url.absoluteString
 
         case .file(let url):
             contentType = "file"

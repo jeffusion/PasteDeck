@@ -288,8 +288,6 @@ class ClipboardViewModel: ObservableObject {
         switch (content1, content2) {
         case (.text(let text1, _), .text(let text2, _)):
             return text1 == text2
-        case (.url(let url1), .url(let url2)):
-            return url1 == url2
         case (.file(let file1), .file(let file2)):
             return file1 == file2
         case (.image(let data1, _), .image(let data2, _)):
@@ -434,7 +432,7 @@ extension ClipboardViewModel {
                 isFavorite: true
             ),
             ClipItem(
-                content: .url(URL(string: "https://github.com")!),
+                content: .text("https://github.com", isRTF: false),
                 sourceApp: "Safari"
             ),
             ClipItem(
