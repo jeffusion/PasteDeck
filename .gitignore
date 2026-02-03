@@ -116,3 +116,11 @@ ApplicationSupport/
 # Xcode user data (if opening SPM with Xcode)
 *.xcodeproj/xcuserdata/
 *.xcworkspace/xcuserdata/
+
+# Agents
+.gemini/
+GEMINI.md
+.claude/
+CLAUDE.md
+AGENTS.md
+
