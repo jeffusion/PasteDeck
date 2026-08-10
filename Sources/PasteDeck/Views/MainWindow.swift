@@ -207,7 +207,6 @@ struct DrawerHeaderView: View {
     @State private var isSearchHovered = false
     @State private var isSearchExpanded = false
     @State private var collapsedControlsWidth: CGFloat = 0
-    @Namespace private var filterSelectionNamespace
 
     var body: some View {
         GeometryReader { geometry in
@@ -283,7 +282,6 @@ struct DrawerHeaderView: View {
                             FilterButton(
                                 filter: filter,
                                 isSelected: viewModel.contentFilter == filter,
-                                selectionNamespace: filterSelectionNamespace,
                                 action: {
                                     focusManager.clearSearchFocus()
                                     withAnimation(filterSelectionAnimation) {
@@ -294,6 +292,24 @@ struct DrawerHeaderView: View {
                         }
                     }
                     .fixedSize()
+                    .backgroundPreferenceValue(FilterButtonBoundsPreferenceKey.self) { bounds in
+                        GeometryReader { proxy in
+                            if let anchor = bounds[viewModel.contentFilter.rawValue] {
+                                let frame = proxy[anchor]
+
+                                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                    .fill(Color.accentColor)
+                                    .frame(width: frame.width, height: frame.height)
+                                    .position(x: frame.midX, y: frame.midY)
+                                    .allowsHitTesting(false)
+                                    .accessibilityHidden(true)
+                                    .animation(
+                                        filterSelectionAnimation,
+                                        value: viewModel.contentFilter
+                                    )
+                            }
+                        }
+                    }
                     .padding(3)
                     .background(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -306,12 +322,18 @@ struct DrawerHeaderView: View {
                     )
                     .shadow(color: .black.opacity(0.08), radius: 5, y: 2)
 
-                    Text("\(viewModel.filteredItems.count) 项")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.secondary)
-                        .monospacedDigit()
-                        .fixedSize()
-                        .accessibilityLabel("当前显示 \(viewModel.filteredItems.count) 项")
+                    HStack(spacing: 2) {
+                        Text("\(viewModel.filteredItems.count)")
+                            .monospacedDigit()
+                            .frame(width: 24, alignment: .trailing)
+
+                        Text("项")
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.secondary)
+                    .frame(width: 40, alignment: .leading)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("当前显示 \(viewModel.filteredItems.count) 项")
                 }
                 .fixedSize()
                 .background(
@@ -406,6 +428,17 @@ private struct CollapsedControlsWidthPreferenceKey: PreferenceKey {
     }
 }
 
+private struct FilterButtonBoundsPreferenceKey: PreferenceKey {
+    static var defaultValue: [String: Anchor<CGRect>] = [:]
+
+    static func reduce(
+        value: inout [String: Anchor<CGRect>],
+        nextValue: () -> [String: Anchor<CGRect>]
+    ) {
+        value.merge(nextValue(), uniquingKeysWith: { _, newValue in newValue })
+    }
+}
+
 // MARK: - Drawer Menu Button
 
 struct DrawerMenuButton: View {
@@ -481,7 +514,6 @@ struct DrawerMenuButton: View {
 struct FilterButton: View {
     let filter: ClipItem.ContentFilter
     let isSelected: Bool
-    let selectionNamespace: Namespace.ID
     let action: () -> Void
     @State private var isHovered = false
 
@@ -505,21 +537,12 @@ struct FilterButton: View {
             .padding(.horizontal, 10)
             .frame(height: 28)
             .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-            .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(Color.accentColor)
-                        .matchedGeometryEffect(
-                            id: "filter-selection",
-                            in: selectionNamespace
-                        )
-                        .allowsHitTesting(false)
-                } else if isHovered {
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(Color(nsColor: .unemphasizedSelectedContentBackgroundColor))
-                        .allowsHitTesting(false)
-                }
-            }
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(Color(nsColor: .unemphasizedSelectedContentBackgroundColor))
+                    .opacity(isHovered && !isSelected ? 1 : 0)
+                    .allowsHitTesting(false)
+            )
             .foregroundColor(isSelected ? .white : .primary)
         }
         .buttonStyle(.plain)
@@ -527,16 +550,66 @@ struct FilterButton: View {
         .accessibilityLabel(filter.displayName)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-        .onContinuousHover { phase in
-            switch phase {
-            case .active:
-                isHovered = true
-                NSCursor.pointingHand.set()
-            case .ended:
-                isHovered = false
-                NSCursor.arrow.set()
-            }
+        .anchorPreference(key: FilterButtonBoundsPreferenceKey.self, value: .bounds) {
+            [filter.rawValue: $0]
         }
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        .pointingHandCursor()
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func pointingHandCursor() -> some View {
+        if #available(macOS 15.0, *) {
+            pointerStyle(.link)
+        } else {
+            background(PointingHandCursorRect())
+        }
+    }
+}
+
+private struct PointingHandCursorRect: NSViewRepresentable {
+    func makeNSView(context: Context) -> PointingHandCursorRectView {
+        PointingHandCursorRectView()
+    }
+
+    func updateNSView(_ nsView: PointingHandCursorRectView, context: Context) {
+        nsView.invalidateCursorRect()
+    }
+}
+
+private final class PointingHandCursorRectView: NSView {
+    override func resetCursorRects() {
+        super.resetCursorRects()
+
+        let cursorRect = bounds.intersection(visibleRect)
+        guard !cursorRect.isEmpty else { return }
+        addCursorRect(cursorRect, cursor: .pointingHand)
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        invalidateCursorRect()
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        let sizeChanged = frame.size != newSize
+        super.setFrameSize(newSize)
+
+        if sizeChanged {
+            invalidateCursorRect()
+        }
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
+    }
+
+    func invalidateCursorRect() {
+        window?.invalidateCursorRects(for: self)
     }
 }
 
