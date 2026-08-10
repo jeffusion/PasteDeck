@@ -14,31 +14,24 @@ import AppKit
 struct InstantClickHandler: NSViewRepresentable {
     let onSingleClick: () -> Void
     let onDoubleClick: () -> Void
-    let onClearFocus: () -> Void
 
     func makeNSView(context: Context) -> ClickableNSView {
         let view = ClickableNSView()
         view.onSingleClick = onSingleClick
         view.onDoubleClick = onDoubleClick
-        view.onClearFocus = onClearFocus
         return view
     }
 
     func updateNSView(_ nsView: ClickableNSView, context: Context) {
         nsView.onSingleClick = onSingleClick
         nsView.onDoubleClick = onDoubleClick
-        nsView.onClearFocus = onClearFocus
     }
 
     class ClickableNSView: NSView {
         var onSingleClick: (() -> Void)?
         var onDoubleClick: (() -> Void)?
-        var onClearFocus: (() -> Void)?
 
         override func mouseDown(with event: NSEvent) {
-            // Clear focus first
-            onClearFocus?()
-
             // Check for double click first
             if event.clickCount == 2 {
                 // Double click - only trigger double click action
@@ -51,92 +44,47 @@ struct InstantClickHandler: NSViewRepresentable {
     }
 }
 
-struct ClipCardView: View {
-    @EnvironmentObject var viewModel: ClipboardViewModel
-    @EnvironmentObject var focusManager: FocusManager
+struct ClipCardView: View, Equatable {
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     let item: ClipItem
     let isSelected: Bool
-    let onSelect: () -> Void
+    let onAction: (ClipCardAction) -> Void
 
     @State private var isHovered = false
+    @State private var preview: CardPreviewCache.Preview?
 
     private let cardSize: CGFloat = 180
-
-    /// Unified brand blue color for all type badges (Paste style)
-    private let badgeColor = Color(red: 0.2, green: 0.5, blue: 1.0)
+    private let headerHeight: CGFloat = 46
+    private let footerHeight: CGFloat = 24
+    private let cornerRadius: CGFloat = 8
 
     var body: some View {
         VStack(spacing: 0) {
-            // Type badge at top (Paste style - full width)
-            HStack(spacing: 8) {
-                // Left: icon + type name
-                HStack(spacing: 4) {
-                    Image(systemName: item.content.iconName)
-                        .font(.system(size: 11))
-                    Text(item.content.typeName)
-                        .font(.system(size: 11, weight: .medium))
-                }
+            cardHeader
 
-                Spacer()
-
-                // Right: relative time
-                Text(item.relativeTimestamp)
-                    .font(.system(size: 11))
-            }
-            .foregroundColor(.white)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(badgeColor)
-            .clipShape(RoundedCornerShape(corners: [.topLeft, .topRight], radius: 8))
-
-            Spacer()
-
-            // Content preview
             contentPreview
-                .frame(width: cardSize - 16, height: cardSize - 90)
+                .frame(width: cardSize, height: contentHeight)
                 .clipped()
-                .padding(.horizontal, 8)
 
-            Spacer()
-
-            // Footer with size/character metadata
-            HStack {
-                Text(item.content.displayMetadata)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(.ultraThinMaterial)
+            cardFooter
         }
         .frame(width: cardSize, height: cardSize)
         .contentShape(Rectangle())
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .stroke(
-                    isSelected ? Color.accentColor : (isHovered ? Color.white.opacity(0.3) : Color.white.opacity(0.1)),
+                    isSelected ? Color.accentColor :
+                        (isHovered ? Color.secondary.opacity(0.55) : Color(nsColor: .separatorColor)),
                     lineWidth: isSelected ? 2 : 1
                 )
         )
-        .shadow(color: .black.opacity(isHovered ? 0.25 : 0.15), radius: isHovered ? 6 : 3, y: 2)
-        .scaleEffect(isHovered ? 1.02 : 1.0)
-        .animation(.easeInOut(duration: 0.15), value: isHovered)
+        .shadow(color: .black.opacity(isSelected ? 0.20 : 0.14), radius: 4, y: 2)
         .overlay(
-            // Use NSView-based click handler for instant response (no SwiftUI gesture delay)
             InstantClickHandler(
-                onSingleClick: {
-                    onSelect()
-                },
-                onDoubleClick: {
-                    viewModel.copyAndPaste(item)
-                },
-                onClearFocus: {
-                    focusManager.clearSearchFocus()
-                }
+                onSingleClick: { onAction(.select) },
+                onDoubleClick: { onAction(.copyAndPaste) }
             )
             .allowsHitTesting(true)
         )
@@ -144,8 +92,170 @@ struct ClipCardView: View {
             isHovered = hovering
         }
         .contextMenu {
-            ClipCardContextMenu(item: item)
+            ClipCardContextMenu(
+                item: item,
+                onAction: onAction
+            )
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(cardAccessibilityLabel)
+        .accessibilityValue(cardAccessibilityValue)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityAction(named: Text("复制")) {
+            onAction(.copy)
+        }
+        .accessibilityAction(named: Text("复制并粘贴")) {
+            onAction(.copyAndPaste)
+        }
+        .accessibilityAction(named: Text(item.isPinned ? "取消置顶" : "置顶")) {
+            onAction(.togglePin)
+        }
+        .accessibilityAction(named: Text(item.isFavorite ? "取消收藏" : "收藏")) {
+            onAction(.toggleFavorite)
+        }
+        .task(id: item.id) {
+            let loadedPreview = await CardPreviewCache.shared.preview(for: item)
+            guard !Task.isCancelled else { return }
+            preview = loadedPreview
+        }
+    }
+
+    static func == (lhs: ClipCardView, rhs: ClipCardView) -> Bool {
+        lhs.item.id == rhs.item.id &&
+        lhs.item.isPinned == rhs.item.isPinned &&
+        lhs.item.isFavorite == rhs.item.isFavorite &&
+        lhs.isSelected == rhs.isSelected
+    }
+
+    private var contentHeight: CGFloat {
+        cardSize - headerHeight - footerHeight
+    }
+
+    private var cardHeader: some View {
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 5) {
+                    Image(systemName: item.content.iconName)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.95))
+
+                    Text(item.content.typeName)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+
+                    if item.isPinned || item.isFavorite {
+                        cardStatusIndicators
+                    }
+                }
+
+                Text(item.relativeTimestamp)
+                    .font(.system(size: 10))
+                    .foregroundColor(.white.opacity(0.76))
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+
+            SourceAppBadge(sourceApp: item.sourceApp)
+        }
+        .padding(.horizontal, 11)
+        .frame(height: headerHeight)
+        .background(headerColor)
+        .clipped()
+    }
+
+    private var cardStatusIndicators: some View {
+        HStack(spacing: 3) {
+            if item.isPinned {
+                statusIcon(
+                    systemName: "pin.fill",
+                    foregroundColor: .white,
+                    help: "已置顶"
+                )
+            }
+
+            if item.isFavorite {
+                statusIcon(
+                    systemName: "star.fill",
+                    foregroundColor: Color(red: 1.0, green: 0.88, blue: 0.52),
+                    help: "已收藏"
+                )
+            }
+        }
+        .animation(pinAnimation, value: item.isPinned)
+        .animation(pinAnimation, value: item.isFavorite)
+    }
+
+    private func statusIcon(
+        systemName: String,
+        foregroundColor: Color,
+        help: String
+    ) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundColor(foregroundColor)
+            .transition(pinTransition)
+            .help(help)
+            .frame(width: 12, height: 12)
+            .accessibilityHidden(true)
+    }
+
+    private var cardFooter: some View {
+        Text(preview?.metadata ?? "")
+            .font(.system(size: 10))
+            .foregroundColor(.secondary)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, 10)
+            .frame(height: footerHeight)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .overlay(alignment: .top) {
+                Divider()
+            }
+    }
+
+    private var headerColor: Color {
+        switch item.content {
+        case .text:
+            return Color(red: 0.09, green: 0.22, blue: 0.40)
+        case .image:
+            return Color(red: 0.11, green: 0.43, blue: 0.40)
+        case .file, .multipleFiles:
+            return Color(red: 0.31, green: 0.35, blue: 0.40)
+        case .color:
+            return Color(red: 0.65, green: 0.36, blue: 0.08)
+        }
+    }
+
+    private var cardAccessibilityLabel: Text {
+        Text("\(item.content.typeName)，\(item.title)")
+    }
+
+    private var cardAccessibilityValue: Text {
+        var values = [item.relativeTimestamp]
+        if let sourceApp = item.sourceApp?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !sourceApp.isEmpty {
+            values.append("来源 \(sourceApp)")
+        }
+        if item.isPinned {
+            values.append("已置顶")
+        }
+        if item.isFavorite {
+            values.append("已收藏")
+        }
+        if isSelected {
+            values.append("已选中")
+        }
+        return Text(values.joined(separator: "，"))
+    }
+
+    private var pinTransition: AnyTransition {
+        accessibilityReduceMotion ? .opacity : .scale(scale: 0.75).combined(with: .opacity)
+    }
+
+    private var pinAnimation: Animation {
+        .easeOut(duration: accessibilityReduceMotion ? 0.12 : 0.16)
     }
 
     @ViewBuilder
@@ -154,8 +264,8 @@ struct ClipCardView: View {
         case .text(let string, _):
             textPreview(string)
 
-        case .image(let data, _):
-            imagePreview(data)
+        case .image:
+            imagePreview()
 
         case .file(let url):
             filePreview(url)
@@ -171,22 +281,22 @@ struct ClipCardView: View {
     private func textPreview(_ text: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(text)
-                .font(.system(size: 11))
+                .font(.system(size: 12))
                 .foregroundColor(.primary)
-                .lineLimit(6)
+                .lineLimit(5)
                 .multilineTextAlignment(.leading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(8)
+        .padding(11)
     }
 
-    private func imagePreview(_ data: Data) -> some View {
+    private func imagePreview() -> some View {
         Group {
-            if let nsImage = NSImage(data: data) {
-                Image(nsImage: nsImage)
+            if let image = preview?.image {
+                Image(decorative: image, scale: 1)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: cardSize - 16, height: cardSize - 90)
+                    .frame(width: cardSize, height: contentHeight)
                     .clipped()
                     .contentShape(Rectangle())
             } else {
@@ -271,117 +381,159 @@ struct ClipCardView: View {
     }
 }
 
+private struct SourceAppBadge: View {
+    let sourceApp: String?
+    @State private var resolvedIcon: NSImage?
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            if let resolvedIcon {
+                Image(nsImage: resolvedIcon)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 62, height: 62)
+                    .offset(x: -7)
+            } else if let initial {
+                Text(initial)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.90))
+                    .lineLimit(1)
+                    .frame(width: 34, height: 34)
+            } else {
+                Image(systemName: "app.dashed")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(.white.opacity(0.80))
+                    .frame(width: 34, height: 34)
+            }
+        }
+        .frame(width: 34, height: 34, alignment: .leading)
+        .help(sourceName ?? "未知来源")
+        .accessibilityHidden(true)
+        .task(id: sourceName) {
+            guard let sourceName else {
+                resolvedIcon = nil
+                return
+            }
+
+            let result = await SourceAppIconResolver.shared.icon(for: sourceName)
+            guard !Task.isCancelled else { return }
+            resolvedIcon = result.image
+        }
+    }
+
+    private var sourceName: String? {
+        guard let sourceApp else { return nil }
+        let trimmed = sourceApp.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private var initial: String? {
+        sourceName?.first.map { String($0).uppercased() }
+    }
+}
+
+private struct SourceAppIconResult: @unchecked Sendable {
+    let image: NSImage?
+}
+
+private actor SourceAppIconResolver {
+    static let shared = SourceAppIconResolver()
+
+    private enum CacheEntry {
+        case icon(NSImage)
+        case missing
+    }
+
+    private var cache: [String: CacheEntry] = [:]
+
+    func icon(for sourceName: String) async -> SourceAppIconResult {
+        let cacheKey = sourceName.lowercased()
+        if let cached = cache[cacheKey] {
+            switch cached {
+            case .icon(let image):
+                return SourceAppIconResult(image: image)
+            case .missing:
+                return SourceAppIconResult(image: nil)
+            }
+        }
+
+        let result = await Self.loadIcon(for: sourceName)
+        if let image = result.image {
+            cache[cacheKey] = .icon(image)
+        } else {
+            cache[cacheKey] = .missing
+        }
+        return result
+    }
+
+    private static func loadIcon(for sourceName: String) async -> SourceAppIconResult {
+        let runningResult = await MainActor.run { () -> SourceAppIconResult in
+            let application = NSWorkspace.shared.runningApplications
+                .first { $0.localizedName?.localizedCaseInsensitiveCompare(sourceName) == .orderedSame }
+            return SourceAppIconResult(image: application?.icon as? NSImage)
+        }
+        if runningResult.image != nil {
+            return runningResult
+        }
+
+        let appURL = await Task.detached(priority: .utility) {
+            let safeName = sourceName.replacingOccurrences(of: "/", with: "")
+            let appName = "\(safeName).app"
+            let directories = [
+                URL(fileURLWithPath: "/Applications", isDirectory: true),
+                FileManager.default.homeDirectoryForCurrentUser
+                    .appendingPathComponent("Applications", isDirectory: true),
+                URL(fileURLWithPath: "/System/Applications", isDirectory: true),
+                URL(fileURLWithPath: "/System/Applications/Utilities", isDirectory: true),
+                URL(fileURLWithPath: "/System/Library/CoreServices", isDirectory: true)
+            ]
+
+            return directories
+                .map { $0.appendingPathComponent(appName, isDirectory: true) }
+                .first { FileManager.default.fileExists(atPath: $0.path) }
+        }.value
+
+        guard let appURL else {
+            return SourceAppIconResult(image: nil)
+        }
+
+        return await MainActor.run {
+            SourceAppIconResult(image: NSWorkspace.shared.icon(forFile: appURL.path))
+        }
+    }
+}
+
 // MARK: - Context Menu
 
 struct ClipCardContextMenu: View {
-    @EnvironmentObject var viewModel: ClipboardViewModel
     let item: ClipItem
+    let onAction: (ClipCardAction) -> Void
 
     var body: some View {
         Button("Copy") {
-            viewModel.copyItem(item)
+            onAction(.copy)
         }
 
         Button("Copy and Paste") {
-            viewModel.copyAndPaste(item)
+            onAction(.copyAndPaste)
         }
 
         Divider()
 
         Button(item.isFavorite ? "Remove from Favorites" : "Add to Favorites") {
-            viewModel.toggleFavorite(item)
+            onAction(.toggleFavorite)
         }
 
         Button(item.isPinned ? "Unpin" : "Pin to Top") {
-            viewModel.togglePin(item)
+            onAction(.togglePin)
         }
 
         Divider()
 
         Button("Delete", role: .destructive) {
-            viewModel.deleteItem(item)
+            onAction(.delete)
         }
-    }
-}
-
-// MARK: - Custom Shape for Top Corners Only
-
-struct RoundedCornerShape: Shape {
-    var corners: Set<Corner>
-    var radius: CGFloat
-
-    enum Corner {
-        case topLeft, topRight, bottomLeft, bottomRight
-    }
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-
-        let topLeft = corners.contains(.topLeft) ? radius : 0
-        let topRight = corners.contains(.topRight) ? radius : 0
-        let bottomLeft = corners.contains(.bottomLeft) ? radius : 0
-        let bottomRight = corners.contains(.bottomRight) ? radius : 0
-
-        path.move(to: CGPoint(x: rect.minX + topLeft, y: rect.minY))
-
-        // Top edge
-        path.addLine(to: CGPoint(x: rect.maxX - topRight, y: rect.minY))
-
-        // Top right corner
-        if topRight > 0 {
-            path.addArc(
-                center: CGPoint(x: rect.maxX - topRight, y: rect.minY + topRight),
-                radius: topRight,
-                startAngle: .degrees(-90),
-                endAngle: .degrees(0),
-                clockwise: false
-            )
-        }
-
-        // Right edge
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - bottomRight))
-
-        // Bottom right corner
-        if bottomRight > 0 {
-            path.addArc(
-                center: CGPoint(x: rect.maxX - bottomRight, y: rect.maxY - bottomRight),
-                radius: bottomRight,
-                startAngle: .degrees(0),
-                endAngle: .degrees(90),
-                clockwise: false
-            )
-        }
-
-        // Bottom edge
-        path.addLine(to: CGPoint(x: rect.minX + bottomLeft, y: rect.maxY))
-
-        // Bottom left corner
-        if bottomLeft > 0 {
-            path.addArc(
-                center: CGPoint(x: rect.minX + bottomLeft, y: rect.maxY - bottomLeft),
-                radius: bottomLeft,
-                startAngle: .degrees(90),
-                endAngle: .degrees(180),
-                clockwise: false
-            )
-        }
-
-        // Left edge
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + topLeft))
-
-        // Top left corner
-        if topLeft > 0 {
-            path.addArc(
-                center: CGPoint(x: rect.minX + topLeft, y: rect.minY + topLeft),
-                radius: topLeft,
-                startAngle: .degrees(180),
-                endAngle: .degrees(270),
-                clockwise: false
-            )
-        }
-
-        path.closeSubpath()
-        return path
     }
 }
 
@@ -397,7 +549,7 @@ struct ClipCardView_Previews: PreviewProvider {
                     sourceApp: "TextEdit"
                 ),
                 isSelected: false,
-                onSelect: { }
+                onAction: { _ in }
             )
 
             ClipCardView(
@@ -407,11 +559,10 @@ struct ClipCardView_Previews: PreviewProvider {
                     isFavorite: true
                 ),
                 isSelected: true,
-                onSelect: { }
+                onAction: { _ in }
             )
         }
         .padding()
-        .environmentObject(ClipboardViewModel.preview)
     }
 }
 #endif

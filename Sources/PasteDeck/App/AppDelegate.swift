@@ -148,15 +148,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func createStatusBarItem() {
         // Create status bar item
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
         if let button = statusItem.button {
             // Set icon - using SF Symbol
-            let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
+            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
             button.image = NSImage(
                 systemSymbolName: "doc.on.clipboard",
                 accessibilityDescription: "PasteDeck"
             )?.withSymbolConfiguration(config)
+            button.imageScaling = .scaleProportionallyDown
 
             // Both left and right click toggle the drawer
             button.action = #selector(statusBarButtonClicked)
