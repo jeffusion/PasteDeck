@@ -12,10 +12,10 @@ import KeyboardShortcuts
 // MARK: - Settings Navigation Item
 
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case general = "通用"
-    case privacy = "隐私"
-    case shortcuts = "键盘快捷键"
-    case about = "关于"
+    case general
+    case privacy
+    case shortcuts
+    case about
 
     var id: String { rawValue }
 
@@ -25,6 +25,15 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .privacy: return "hand.raised"
         case .shortcuts: return "keyboard"
         case .about: return "info.circle"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .general: return L10n.string("settings.tab.general")
+        case .privacy: return L10n.string("settings.tab.privacy")
+        case .shortcuts: return L10n.string("settings.tab.shortcuts")
+        case .about: return L10n.string("settings.tab.about")
         }
     }
 }
@@ -38,7 +47,7 @@ struct SettingsView: View {
         NavigationSplitView {
             // Sidebar
             List(SettingsTab.allCases, selection: $selectedTab) { tab in
-                Label(tab.rawValue, systemImage: tab.icon)
+                Label(tab.title, systemImage: tab.icon)
                     .tag(tab)
             }
             .listStyle(.sidebar)
@@ -90,24 +99,37 @@ struct GeneralSettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 // Header
-                Text("通用")
+                Text(L10n.string("settings.general.title"))
                     .font(.title)
                     .fontWeight(.bold)
                     .padding(.bottom, 8)
 
                 // Basic Settings Group
                 SettingsGroupBox {
-                    SettingsToggleRow(title: "登录时打开", isOn: $launchAtLogin)
+                    SettingsToggleRow(
+                        title: L10n.string("settings.general.launch_at_login"),
+                        isOn: $launchAtLogin
+                    )
                     Divider()
-                    SettingsToggleRow(title: "iCloud 同步", isOn: $iCloudSyncEnabled, subtitle: iCloudSyncEnabled ? "已同步" : nil)
+                    SettingsToggleRow(
+                        title: L10n.string("settings.general.icloud_sync"),
+                        isOn: $iCloudSyncEnabled,
+                        subtitle: iCloudSyncEnabled ? L10n.string("settings.general.synced") : nil
+                    )
                     Divider()
-                    SettingsToggleRow(title: "显示在菜单栏上", isOn: $showInMenuBar)
+                    SettingsToggleRow(
+                        title: L10n.string("settings.general.show_menu_bar"),
+                        isOn: $showInMenuBar
+                    )
                     Divider()
-                    SettingsToggleRow(title: "音效", isOn: $soundEnabled)
+                    SettingsToggleRow(
+                        title: L10n.string("settings.general.sound"),
+                        isOn: $soundEnabled
+                    )
                 }
 
                 // Paste Mode Group
-                Text("粘贴项目")
+                Text(L10n.string("settings.general.paste_items"))
                     .font(.headline)
                     .padding(.top, 8)
 
@@ -120,11 +142,11 @@ struct GeneralSettingsView: View {
                                     .foregroundColor(pasteMode == "activeApp" ? .accentColor : .secondary)
                                     .onTapGesture { pasteMode = "activeApp" }
 
-                                Text("到当前活动应用")
+                                Text(L10n.string("settings.general.paste_active_app"))
                                     .fontWeight(pasteMode == "activeApp" ? .medium : .regular)
                             }
 
-                            Text("将选定的项目直接粘贴到您当前正在使用的应用程序中。")
+                            Text(L10n.string("settings.general.paste_active_app.description"))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                                 .padding(.leading, 24)
@@ -139,11 +161,11 @@ struct GeneralSettingsView: View {
                                     .foregroundColor(pasteMode == "clipboard" ? .accentColor : .secondary)
                                     .onTapGesture { pasteMode = "clipboard" }
 
-                                Text("到剪贴板")
+                                Text(L10n.string("settings.general.paste_clipboard"))
                                     .fontWeight(pasteMode == "clipboard" ? .medium : .regular)
                             }
 
-                            Text("将选定的项目复制到系统剪贴板，以便稍后手动粘贴。")
+                            Text(L10n.string("settings.general.paste_clipboard.description"))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                                 .padding(.leading, 24)
@@ -157,13 +179,13 @@ struct GeneralSettingsView: View {
                                 .foregroundColor(alwaysPastePlainText ? .accentColor : .secondary)
                                 .onTapGesture { alwaysPastePlainText.toggle() }
 
-                            Text("始终以纯文本粘贴")
+                            Text(L10n.string("settings.general.always_plain_text"))
                         }
                     }
                 }
 
                 // History Retention Group
-                Text("保留历史")
+                Text(L10n.string("settings.general.retention"))
                     .font(.headline)
                     .padding(.top, 8)
 
@@ -175,7 +197,7 @@ struct GeneralSettingsView: View {
 
                         HStack {
                             Spacer()
-                            Button("删除历史...") {
+                            Button(L10n.string("settings.general.delete_history")) {
                                 // TODO: Show confirmation dialog
                             }
                         }
@@ -202,7 +224,7 @@ struct GeneralSettingsView: View {
                 // If sync failed, revert the toggle
                 if actualState != newValue {
                     launchAtLogin = actualState
-                    errorMessage = "无法更改登录时打开设置，请检查系统权限。"
+                    errorMessage = L10n.string("settings.error.launch_at_login")
                     showErrorAlert = true
                 }
             }
@@ -227,16 +249,16 @@ struct GeneralSettingsView: View {
                 }
             }
         }
-        .alert("设置失败", isPresented: $showErrorAlert) {
-            Button("好的", role: .cancel) {}
+        .alert(L10n.string("settings.error.title"), isPresented: $showErrorAlert) {
+            Button(L10n.string("common.ok"), role: .cancel) {}
         } message: {
             Text(errorMessage)
         }
-        .alert("缩短保留时间", isPresented: $showRetentionConfirmation) {
-            Button("取消", role: .cancel) {
+        .alert(L10n.string("settings.retention.shorten.title"), isPresented: $showRetentionConfirmation) {
+            Button(L10n.string("common.cancel"), role: .cancel) {
                 pendingRetentionDays = nil
             }
-            Button("确认删除", role: .destructive) {
+            Button(L10n.string("settings.retention.confirm_delete"), role: .destructive) {
                 if let newDays = pendingRetentionDays {
                     // Execute cleanup
                     Task {
@@ -254,14 +276,14 @@ struct GeneralSettingsView: View {
             }
         } message: {
             if let newDays = pendingRetentionDays {
-                let daysText = newDays == 1 ? "1 天" : "\(newDays) 天"
-                Text("缩短保留时间将立即删除超过 \(daysText) 的历史记录（不包括收藏和置顶项目）。此操作不可撤销。")
+                let daysText = L10n.plural("duration.days", count: newDays)
+                Text(L10n.format("settings.retention.shorten.message", daysText))
             }
         }
-        .alert("清理完成", isPresented: $showRetentionResult) {
-            Button("好的", role: .cancel) {}
+        .alert(L10n.string("settings.retention.cleanup.title"), isPresented: $showRetentionResult) {
+            Button(L10n.string("common.ok"), role: .cancel) {}
         } message: {
-            Text("已删除 \(deletedItemsCount) 条过期历史记录")
+            Text(L10n.plural("count.deleted_history", count: deletedItemsCount))
         }
     }
 }
@@ -276,13 +298,13 @@ struct PrivacySettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                Text("隐私")
+                Text(L10n.string("settings.privacy.title"))
                     .font(.title)
                     .fontWeight(.bold)
                     .padding(.bottom, 8)
 
                 // Accessibility Permission
-                Text("辅助功能权限")
+                Text(L10n.string("settings.privacy.accessibility"))
                     .font(.headline)
 
                 SettingsGroupBox {
@@ -291,11 +313,14 @@ struct PrivacySettingsView: View {
                             HStack {
                                 Image(systemName: hasAccessibilityPermission ? "checkmark.circle.fill" : "xmark.circle.fill")
                                     .foregroundColor(hasAccessibilityPermission ? .green : .orange)
-                                Text(hasAccessibilityPermission ? "已授权" : "未授权")
+                                Text(L10n.string(
+                                    hasAccessibilityPermission ?
+                                        "settings.privacy.authorized" : "settings.privacy.not_authorized"
+                                ))
                                     .fontWeight(.medium)
                             }
 
-                            Text("需要辅助功能权限才能使用自动粘贴功能")
+                            Text(L10n.string("settings.privacy.accessibility.description"))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -303,7 +328,7 @@ struct PrivacySettingsView: View {
                         Spacer()
 
                         if !hasAccessibilityPermission {
-                            Button("打开引导") {
+                            Button(L10n.string("settings.privacy.open_guide")) {
                                 AccessibilityPermissionGuide.shared.showGuide()
                             }
                         }
@@ -311,18 +336,18 @@ struct PrivacySettingsView: View {
                 }
 
                 // Excluded Apps
-                Text("排除的应用")
+                Text(L10n.string("settings.privacy.excluded_apps"))
                     .font(.headline)
                     .padding(.top, 8)
 
                 SettingsGroupBox {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("以下应用的剪贴板内容将不会被捕获：")
+                        Text(L10n.string("settings.privacy.excluded_apps.description"))
                             .font(.caption)
                             .foregroundColor(.secondary)
 
                         if excludedApps.isEmpty {
-                            Text("暂无排除的应用")
+                            Text(L10n.string("settings.privacy.excluded_apps.empty"))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .center)
@@ -340,13 +365,16 @@ struct PrivacySettingsView: View {
                                             .foregroundColor(.red)
                                     }
                                     .buttonStyle(.plain)
+                                    .accessibilityLabel(
+                                        L10n.format("settings.privacy.remove_app", app)
+                                    )
                                 }
                             }
                         }
 
                         Divider()
 
-                        Button("添加应用...") {
+                        Button(L10n.string("settings.privacy.add_app")) {
                             // TODO: Show app picker
                         }
                     }
@@ -392,38 +420,38 @@ struct ShortcutsSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                Text("键盘快捷键")
+                Text(L10n.string("settings.shortcuts.title"))
                     .font(.title)
                     .fontWeight(.bold)
                     .padding(.bottom, 8)
 
                 // 基础快捷键
-                Text("基础")
+                Text(L10n.string("settings.shortcuts.basic"))
                     .font(.headline)
 
                 SettingsGroupBox {
                     VStack(spacing: 12) {
                         ShortcutRecorderRow(
-                            title: "显示 PasteDeck",
+                            title: L10n.string("settings.shortcuts.show_pastedeck"),
                             name: .showClipboard
                         )
                         Divider()
                         ShortcutRecorderRow(
-                            title: "清除历史",
+                            title: L10n.string("settings.shortcuts.clear_history"),
                             name: .clearHistory
                         )
                     }
                 }
 
                 // 快速粘贴快捷键
-                Text("快速粘贴")
+                Text(L10n.string("settings.shortcuts.quick_paste"))
                     .font(.headline)
                     .padding(.top, 8)
 
                 SettingsGroupBox {
                     VStack(spacing: 12) {
                         HStack {
-                            Text("直接粘贴历史中的第 N 项（无需打开抽屉）")
+                            Text(L10n.string("settings.shortcuts.quick_paste.description"))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -431,13 +459,16 @@ struct ShortcutsSettingsView: View {
                         Divider()
 
                         HStack {
-                            Text("快速粘贴")
+                            Text(L10n.string("settings.shortcuts.quick_paste"))
                                 .frame(width: 150, alignment: .leading)
                             Spacer()
                             Button(action: {
                                 showModifierPicker = true
                             }) {
-                                Text("\(hotKeyManager.quickPasteModifiers.displayString) + 1...9")
+                                Text(L10n.format(
+                                    "settings.shortcuts.quick_paste.preview",
+                                    hotKeyManager.quickPasteModifiers.displayString
+                                ))
                                     .font(.system(.body, design: .monospaced))
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
@@ -451,7 +482,7 @@ struct ShortcutsSettingsView: View {
 
                 HStack {
                     Spacer()
-                    Button("重置为默认") {
+                    Button(L10n.string("settings.shortcuts.reset")) {
                         resetAllShortcuts()
                     }
                 }
@@ -486,36 +517,36 @@ struct ModifierPickerView: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            Text("快速粘贴修饰符")
+            Text(L10n.string("settings.shortcuts.modifiers.title"))
                 .font(.headline)
 
             VStack(alignment: .leading, spacing: 12) {
-                Toggle("⌘ Command", isOn: $tempModifiers.command)
-                Toggle("⌃ Control", isOn: $tempModifiers.control)
-                Toggle("⌥ Option", isOn: $tempModifiers.option)
-                Toggle("⇧ Shift", isOn: $tempModifiers.shift)
+                Toggle(L10n.string("settings.shortcuts.modifier.command"), isOn: $tempModifiers.command)
+                Toggle(L10n.string("settings.shortcuts.modifier.control"), isOn: $tempModifiers.control)
+                Toggle(L10n.string("settings.shortcuts.modifier.option"), isOn: $tempModifiers.option)
+                Toggle(L10n.string("settings.shortcuts.modifier.shift"), isOn: $tempModifiers.shift)
             }
             .toggleStyle(.checkbox)
 
-            Text("预览: \(tempModifiers.displayString) + 1...9")
+            Text(L10n.format("settings.shortcuts.modifiers.preview", tempModifiers.displayString))
                 .font(.caption)
                 .foregroundColor(.secondary)
 
             if !tempModifiers.isValid {
-                Text("至少选择一个修饰符")
+                Text(L10n.string("settings.shortcuts.modifiers.required"))
                     .font(.caption)
                     .foregroundColor(.red)
             }
 
             HStack {
-                Button("取消") {
+                Button(L10n.string("common.cancel")) {
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)
 
                 Spacer()
 
-                Button("确定") {
+                Button(L10n.string("common.confirm")) {
                     modifiers = tempModifiers
                     dismiss()
                 }
@@ -557,10 +588,14 @@ struct AboutSettingsView: View {
                 .font(.title)
                 .fontWeight(.bold)
 
-            Text("Version 0.1.0 (Beta)")
+            Text(L10n.format(
+                "settings.about.version",
+                appVersion,
+                L10n.string("settings.about.beta")
+            ))
                 .foregroundColor(.secondary)
 
-            Text("一款现代化的开源 macOS 剪贴板管理器")
+            Text(L10n.string("settings.about.tagline"))
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
 
@@ -569,11 +604,11 @@ struct AboutSettingsView: View {
 
             VStack(spacing: 8) {
                 Link(destination: URL(string: "https://github.com/example/PasteDeck")!) {
-                    Label("在 GitHub 上查看", systemImage: "link")
+                    Label(L10n.string("settings.about.github"), systemImage: "link")
                 }
 
                 Link(destination: URL(string: "https://github.com/example/PasteDeck/issues")!) {
-                    Label("报告问题", systemImage: "exclamationmark.bubble")
+                    Label(L10n.string("settings.about.report_issue"), systemImage: "exclamationmark.bubble")
                 }
             }
 
@@ -584,13 +619,17 @@ struct AboutSettingsView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
 
-                Text("MIT 许可证")
+                Text(L10n.string("settings.about.license"))
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(24)
+    }
+
+    private var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0"
     }
 }
 

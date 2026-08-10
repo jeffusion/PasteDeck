@@ -101,16 +101,20 @@ struct ClipCardView: View, Equatable {
         .accessibilityLabel(cardAccessibilityLabel)
         .accessibilityValue(cardAccessibilityValue)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityAction(named: Text("复制")) {
+        .accessibilityAction(named: Text(L10n.string("card.action.copy"))) {
             onAction(.copy)
         }
-        .accessibilityAction(named: Text("复制并粘贴")) {
+        .accessibilityAction(named: Text(L10n.string("card.action.copy_and_paste"))) {
             onAction(.copyAndPaste)
         }
-        .accessibilityAction(named: Text(item.isPinned ? "取消置顶" : "置顶")) {
+        .accessibilityAction(named: Text(L10n.string(
+            item.isPinned ? "card.action.unpin" : "card.action.pin"
+        ))) {
             onAction(.togglePin)
         }
-        .accessibilityAction(named: Text(item.isFavorite ? "取消收藏" : "收藏")) {
+        .accessibilityAction(named: Text(L10n.string(
+            item.isFavorite ? "card.action.unfavorite" : "card.action.favorite"
+        ))) {
             onAction(.toggleFavorite)
         }
         .task(id: item.id) {
@@ -171,7 +175,7 @@ struct ClipCardView: View, Equatable {
                 statusIcon(
                     systemName: "pin.fill",
                     foregroundColor: .white,
-                    help: "已置顶"
+                    help: L10n.string("card.accessibility.pinned")
                 )
             }
 
@@ -179,7 +183,7 @@ struct ClipCardView: View, Equatable {
                 statusIcon(
                     systemName: "star.fill",
                     foregroundColor: Color(red: 1.0, green: 0.88, blue: 0.52),
-                    help: "已收藏"
+                    help: L10n.string("card.accessibility.favorite")
                 )
             }
         }
@@ -229,25 +233,25 @@ struct ClipCardView: View, Equatable {
     }
 
     private var cardAccessibilityLabel: Text {
-        Text("\(item.content.typeName)，\(item.title)")
+        Text(L10n.format("card.accessibility.label", item.content.typeName, item.title))
     }
 
     private var cardAccessibilityValue: Text {
         var values = [item.relativeTimestamp]
         if let sourceApp = item.sourceApp?.trimmingCharacters(in: .whitespacesAndNewlines),
            !sourceApp.isEmpty {
-            values.append("来源 \(sourceApp)")
+            values.append(L10n.format("card.accessibility.source", sourceApp))
         }
         if item.isPinned {
-            values.append("已置顶")
+            values.append(L10n.string("card.accessibility.pinned"))
         }
         if item.isFavorite {
-            values.append("已收藏")
+            values.append(L10n.string("card.accessibility.favorite"))
         }
         if isSelected {
-            values.append("已选中")
+            values.append(L10n.string("card.accessibility.selected"))
         }
-        return Text(values.joined(separator: "，"))
+        return Text(values.joined(separator: L10n.string("common.list_separator")))
     }
 
     private var pinTransition: AnyTransition {
@@ -327,7 +331,7 @@ struct ClipCardView: View, Equatable {
                 .font(.system(size: 28))
                 .foregroundColor(.accentColor)
 
-            Text("\(urls.count) files")
+            Text(L10n.plural("count.files", count: urls.count))
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -408,7 +412,7 @@ private struct SourceAppBadge: View {
             }
         }
         .frame(width: 34, height: 34, alignment: .leading)
-        .help(sourceName ?? "未知来源")
+        .help(sourceName ?? L10n.string("card.source.unknown"))
         .accessibilityHidden(true)
         .task(id: sourceName) {
             guard let sourceName else {
@@ -511,27 +515,29 @@ struct ClipCardContextMenu: View {
     let onAction: (ClipCardAction) -> Void
 
     var body: some View {
-        Button("Copy") {
+        Button(L10n.string("card.action.copy")) {
             onAction(.copy)
         }
 
-        Button("Copy and Paste") {
+        Button(L10n.string("card.action.copy_and_paste")) {
             onAction(.copyAndPaste)
         }
 
         Divider()
 
-        Button(item.isFavorite ? "Remove from Favorites" : "Add to Favorites") {
+        Button(L10n.string(
+            item.isFavorite ? "card.action.unfavorite" : "card.action.favorite"
+        )) {
             onAction(.toggleFavorite)
         }
 
-        Button(item.isPinned ? "Unpin" : "Pin to Top") {
+        Button(L10n.string(item.isPinned ? "card.action.unpin" : "card.action.pin")) {
             onAction(.togglePin)
         }
 
         Divider()
 
-        Button("Delete", role: .destructive) {
+        Button(L10n.string("card.action.delete"), role: .destructive) {
             onAction(.delete)
         }
     }

@@ -51,7 +51,10 @@ actor CardPreviewCache {
     private static func makePreview(for content: ClipContent) -> Preview {
         switch content {
         case .text(let string, _):
-            return Preview(image: nil, metadata: "\(string.count) 字符")
+            return Preview(
+                image: nil,
+                metadata: L10n.plural("count.characters", count: string.count)
+            )
 
         case .image(let data, _):
             return makeImagePreview(from: data)
@@ -93,7 +96,7 @@ actor CardPreviewCache {
         let resolvedHeight = height ?? image?.height
         let metadata: String
         if let resolvedWidth, let resolvedHeight {
-            metadata = "\(resolvedWidth) × \(resolvedHeight)"
+            metadata = "\(L10n.integer(resolvedWidth)) × \(L10n.integer(resolvedHeight))"
         } else {
             metadata = ""
         }
@@ -108,10 +111,7 @@ actor CardPreviewCache {
 
         var parts: [String] = []
         if totalSize > 0 {
-            let formatter = ByteCountFormatter()
-            formatter.allowedUnits = [.useKB, .useMB, .useGB]
-            formatter.countStyle = .file
-            parts.append(formatter.string(fromByteCount: totalSize))
+            parts.append(L10n.byteCount(totalSize))
         }
 
         if urls.count == 1 {
@@ -120,7 +120,7 @@ actor CardPreviewCache {
                 parts.append(fileExtension.uppercased())
             }
         } else if !urls.isEmpty {
-            parts.append("\(urls.count) 个文件")
+            parts.append(L10n.plural("count.files", count: urls.count))
         }
 
         return parts.joined(separator: " · ")

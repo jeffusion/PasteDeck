@@ -16,6 +16,7 @@ CONTENTS_DIR := $(APP_DIR)/Contents
 MACOS_DIR := $(CONTENTS_DIR)/MacOS
 RESOURCES_DIR := $(CONTENTS_DIR)/Resources
 SOURCE_RESOURCES := Resources
+LOCALIZATION_RESOURCES := Sources/Resources
 
 # Output files
 EXECUTABLE := $(MACOS_DIR)/$(APP_NAME)
@@ -90,6 +91,13 @@ app: release
 		'<dict>' \
 		'    <key>CFBundleDevelopmentRegion</key>' \
 		'    <string>en</string>' \
+		'    <key>CFBundleLocalizations</key>' \
+		'    <array>' \
+		'        <string>en</string>' \
+		'        <string>zh-Hans</string>' \
+		'        <string>ja</string>' \
+		'        <string>ru</string>' \
+		'    </array>' \
 		'    <key>CFBundleExecutable</key>' \
 		'    <string>$(APP_NAME)</string>' \
 		'    <key>CFBundleIconFile</key>' \
@@ -130,6 +138,10 @@ app: release
 	else \
 		echo "⚠️  No app icon found (app will use default icon)"; \
 	fi
+	@for locale in en zh-Hans ja ru; do \
+		cp -R "$(LOCALIZATION_RESOURCES)/$$locale.lproj" "$(RESOURCES_DIR)/"; \
+	done
+	@echo "✅ Localizations copied (en, zh-Hans, ja, ru)"
 	@echo "✅ App bundle created at: $(APP_DIR)"
 
 # Sign the app bundle (ad-hoc)

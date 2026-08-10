@@ -55,7 +55,7 @@ class AccessibilityPermissionGuide {
         })
         let hostingController = NSHostingController(rootView: view)
         let window = NSWindow(contentViewController: hostingController)
-        window.title = "辅助功能权限"
+        window.title = L10n.string("window.accessibility.title")
         window.styleMask = [.titled, .closable]
         window.setContentSize(NSSize(width: 500, height: 480))
         window.center()

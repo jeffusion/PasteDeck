@@ -27,6 +27,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var globalMouseEventMonitor: Any?
     private var settingsWindow: NSWindow?
 
+    private var isUITesting: Bool {
+        ProcessInfo.processInfo.arguments.contains("--ui-testing")
+    }
+
     // MARK: - Application Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -43,12 +47,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupClipboardWindow()
         setupKeyboardShortcuts()
         setupNotifications()
-        setupLaunchAtLogin()
+        handleUITestingLaunchArguments()
+        if !isUITesting {
+            setupLaunchAtLogin()
+        }
 
         // Perform startup cleanup based on retention settings
-        performStartupCleanup()
+        if !isUITesting {
+            performStartupCleanup()
+        }
 
         print("🚀 PasteDeck launched successfully")
+    }
+
+    private func handleUITestingLaunchArguments() {
+        let arguments = Set(ProcessInfo.processInfo.arguments)
+        guard arguments.contains("--ui-testing") else { return }
+
+        print("🌐 UI testing language: \(L10n.language.rawValue)")
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            guard let self else { return }
+            if arguments.contains("--show-settings") {
+                self.showSettings()
+            }
+            if arguments.contains("--show-drawer") {
+                self.showClipboardWindow()
+            }
+            if arguments.contains("--show-permission-guide") {
+                AccessibilityPermissionGuide.shared.showGuide()
+            }
+        }
     }
 
     private func registerDefaultSettings() {
@@ -126,7 +155,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupClipboardMonitor() {
         clipboardMonitor = ClipboardMonitor()
-        clipboardMonitor.startMonitoring()
+        if !isUITesting {
+            clipboardMonitor.startMonitoring()
+        }
     }
 
     private func setupViewModel() {
@@ -486,7 +517,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 .environmentObject(clipboardViewModel)
             let hostingController = NSHostingController(rootView: settingsView)
             let window = NSWindow(contentViewController: hostingController)
-            window.title = "设置"
+            window.title = L10n.string("window.settings.title")
             window.styleMask = [.titled, .closable, .miniaturizable]
             window.setContentSize(NSSize(width: 650, height: 500))
             window.isReleasedWhenClosed = false

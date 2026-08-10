@@ -186,27 +186,29 @@ struct ClipItemContextMenu: View {
     let item: ClipItem
 
     var body: some View {
-        Button("Copy") {
+        Button(L10n.string("card.action.copy")) {
             viewModel.copyItem(item)
         }
 
-        Button("Copy and Paste") {
+        Button(L10n.string("card.action.copy_and_paste")) {
             viewModel.copyAndPaste(item)
         }
 
         Divider()
 
-        Button(item.isFavorite ? "Remove from Favorites" : "Add to Favorites") {
+        Button(L10n.string(
+            item.isFavorite ? "card.action.unfavorite" : "card.action.favorite"
+        )) {
             viewModel.toggleFavorite(item)
         }
 
-        Button(item.isPinned ? "Unpin" : "Pin to Top") {
+        Button(L10n.string(item.isPinned ? "card.action.unpin" : "card.action.pin")) {
             viewModel.togglePin(item)
         }
 
         Divider()
 
-        Button("Delete", role: .destructive) {
+        Button(L10n.string("card.action.delete"), role: .destructive) {
             viewModel.deleteItem(item)
         }
     }

@@ -78,9 +78,9 @@ enum LaunchAtLoginError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .registrationFailed(let error):
-            return "无法启用登录时打开: \(error.localizedDescription)"
+            return L10n.format("service.launch_at_login.enable_error", error.localizedDescription)
         case .unregistrationFailed(let error):
-            return "无法禁用登录时打开: \(error.localizedDescription)"
+            return L10n.format("service.launch_at_login.disable_error", error.localizedDescription)
         }
     }
 }

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>count.items</key><dict><key>NSStringLocalizedFormatKey</key><string>%#@value@</string><key>value</key><dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>%lld 项</string></dict></dict>
+    <key>count.captured</key><dict><key>NSStringLocalizedFormatKey</key><string>已捕获 %#@value@</string><key>value</key><dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>%lld 项</string></dict></dict>
+    <key>count.files</key><dict><key>NSStringLocalizedFormatKey</key><string>%#@value@</string><key>value</key><dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>%lld 个文件</string></dict></dict>
+    <key>count.characters</key><dict><key>NSStringLocalizedFormatKey</key><string>%#@value@</string><key>value</key><dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>%lld 个字符</string></dict></dict>
+    <key>count.deleted_history</key><dict><key>NSStringLocalizedFormatKey</key><string>已删除 %#@value@</string><key>value</key><dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>%lld 条过期历史记录</string></dict></dict>
+    <key>duration.days</key><dict><key>NSStringLocalizedFormatKey</key><string>%#@value@</string><key>value</key><dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>%lld 天</string></dict></dict>
+    <key>duration.weeks</key><dict><key>NSStringLocalizedFormatKey</key><string>%#@value@</string><key>value</key><dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>%lld 周</string></dict></dict>
+    <key>duration.months</key><dict><key>NSStringLocalizedFormatKey</key><string>%#@value@</string><key>value</key><dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>%lld 个月</string></dict></dict>
+    <key>duration.years</key><dict><key>NSStringLocalizedFormatKey</key><string>%#@value@</string><key>value</key><dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>%lld 年</string></dict></dict>
+</dict>
+</plist>

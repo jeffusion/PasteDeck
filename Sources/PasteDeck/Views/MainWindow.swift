@@ -222,7 +222,7 @@ struct DrawerHeaderView: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
 
-                            TextField("搜索...", text: $viewModel.searchText)
+                            TextField(L10n.string("drawer.search.placeholder"), text: $viewModel.searchText)
                                 .textFieldStyle(.plain)
                                 .font(.system(size: 12))
                                 .focused(isSearchFocused)
@@ -234,8 +234,8 @@ struct DrawerHeaderView: View {
                                         .foregroundColor(.secondary)
                                 }
                                 .buttonStyle(.plain)
-                                .help("清除搜索")
-                                .accessibilityLabel("清除搜索")
+                                .help(L10n.string("drawer.search.clear"))
+                                .accessibilityLabel(L10n.string("drawer.search.clear"))
                             }
                         }
                         .padding(.horizontal, 12)
@@ -252,8 +252,8 @@ struct DrawerHeaderView: View {
                                     .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                             }
                             .buttonStyle(.plain)
-                            .help("搜索剪贴板历史")
-                            .accessibilityLabel("搜索剪贴板历史")
+                            .help(L10n.string("drawer.search.history"))
+                            .accessibilityLabel(L10n.string("drawer.search.history"))
                         }
                     }
                     .frame(width: isSearchExpanded ? 210 : 34, height: 34, alignment: .leading)
@@ -322,18 +322,18 @@ struct DrawerHeaderView: View {
                     )
                     .shadow(color: .black.opacity(0.08), radius: 5, y: 2)
 
-                    HStack(spacing: 2) {
-                        Text("\(viewModel.filteredItems.count)")
-                            .monospacedDigit()
-                            .frame(width: 24, alignment: .trailing)
-
-                        Text("项")
-                    }
+                    Text(L10n.integer(viewModel.filteredItems.count))
+                    .monospacedDigit()
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.secondary)
-                    .frame(width: 40, alignment: .leading)
+                    .frame(width: 40, alignment: .center)
                     .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("当前显示 \(viewModel.filteredItems.count) 项")
+                    .accessibilityLabel(
+                        L10n.format(
+                            "drawer.count.accessibility",
+                            L10n.plural("count.items", count: viewModel.filteredItems.count)
+                        )
+                    )
                 }
                 .fixedSize()
                 .background(
@@ -448,22 +448,22 @@ struct DrawerMenuButton: View {
 
     var body: some View {
         Menu {
-            Button("设置...") {
+            Button(L10n.string("drawer.menu.settings")) {
                 openSettings()
             }
             .keyboardShortcut(",", modifiers: .command)
 
-            Button("关于 PasteDeck") {
+            Button(L10n.string("drawer.menu.about")) {
                 openAbout()
             }
 
             Divider()
 
-            Text("\(itemCount) 项已捕获")
+            Text(L10n.plural("count.captured", count: itemCount))
 
             Divider()
 
-            Button("退出 PasteDeck") {
+            Button(L10n.string("drawer.menu.quit")) {
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q", modifiers: .command)
@@ -495,8 +495,8 @@ struct DrawerMenuButton: View {
                 isHovered = hovering
             }
         }
-        .help("更多操作")
-        .accessibilityLabel("更多操作")
+        .help(L10n.string("drawer.menu.more"))
+        .accessibilityLabel(L10n.string("drawer.menu.more"))
     }
 
     private func openSettings() {
@@ -625,12 +625,16 @@ struct DrawerEmptyStateView: View {
                 .foregroundColor(.secondary)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(viewModel.isSearching ? "No results found" : "No clipboard history")
+                Text(L10n.string(
+                    viewModel.isSearching ?
+                        "drawer.empty.search.title" : "drawer.empty.history.title"
+                ))
                     .font(.headline)
 
-                Text(viewModel.isSearching ?
-                     "Try a different search term" :
-                     "Copy something to get started")
+                Text(L10n.string(
+                    viewModel.isSearching ?
+                        "drawer.empty.search.message" : "drawer.empty.history.message"
+                ))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

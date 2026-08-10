@@ -12,12 +12,6 @@ import SwiftUI
 
 /// Represents a single clipboard item with metadata
 struct ClipItem: Identifiable, Codable, Equatable, Hashable, Sendable {
-    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter
-    }()
-
     // MARK: - Properties
 
     /// Unique identifier
@@ -95,16 +89,16 @@ struct ClipItem: Identifiable, Codable, Equatable, Hashable, Sendable {
             // Use first line or first 50 characters
             let firstLine = string.components(separatedBy: .newlines).first ?? string
             let preview = firstLine.prefix(50)
-            return preview.count < firstLine.count ? "\(preview)..." : String(preview)
+            return preview.count < firstLine.count ? "\(preview)…" : String(preview)
 
         case .image:
-            return "Image"
+            return L10n.string("card.title.image")
 
         case .file(let url):
             return url.lastPathComponent
 
         case .multipleFiles(let urls):
-            return "\(urls.count) files"
+            return L10n.plural("count.files", count: urls.count)
 
         case .color(let colorInfo):
             return colorInfo.hexString
@@ -113,13 +107,13 @@ struct ClipItem: Identifiable, Codable, Equatable, Hashable, Sendable {
 
     /// Human-readable timestamp
     var relativeTimestamp: String {
-        Self.relativeDateFormatter.localizedString(for: createdAt, relativeTo: Date())
+        L10n.relativeTime(from: createdAt)
     }
 
     /// Size-friendly description of content size
     var sizeDescription: String {
         let bytes = content.estimatedSize
-        return ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+        return L10n.byteCount(Int64(bytes))
     }
 
     /// Whether this item should be kept permanently (favorites or pinned)
@@ -342,11 +336,11 @@ extension ClipItem {
 
         var displayName: String {
             switch self {
-            case .all: return "全部"
-            case .text: return "文本"
-            case .images: return "图片"
-            case .files: return "文件"
-            case .colors: return "颜色"
+            case .all: return L10n.string("filter.all")
+            case .text: return L10n.string("filter.text")
+            case .images: return L10n.string("filter.images")
+            case .files: return L10n.string("filter.files")
+            case .colors: return L10n.string("filter.colors")
             }
         }
 
@@ -385,6 +379,16 @@ extension ClipItem {
         case yesterday = "Yesterday"
         case thisWeek = "This Week"
         case thisMonth = "This Month"
+
+        var displayName: String {
+            switch self {
+            case .all: return L10n.string("date_filter.all")
+            case .today: return L10n.string("date_filter.today")
+            case .yesterday: return L10n.string("date_filter.yesterday")
+            case .thisWeek: return L10n.string("date_filter.this_week")
+            case .thisMonth: return L10n.string("date_filter.this_month")
+            }
+        }
 
         func matches(date: Date) -> Bool {
             let calendar = Calendar.current
