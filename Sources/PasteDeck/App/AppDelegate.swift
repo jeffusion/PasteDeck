@@ -437,8 +437,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         })
     }
 
-    private func hideClipboardWindow() {
-        guard clipboardWindow.isVisible else { return }
+    private func hideClipboardWindow(completion: (() -> Void)? = nil) {
+        guard clipboardWindow.isVisible else {
+            completion?()
+            return
+        }
 
         let restoreSettingsFocus = shouldRestoreSettingsFocusAfterDrawerClose()
 
@@ -460,8 +463,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Get the visual effect view
         guard let clippingContainer = clipboardWindow.contentView,
               let visualEffectView = clippingContainer.subviews.first else {
-            clipboardWindow.orderOut(nil)
-            clipboardWindow.level = .popUpMenu
+            finishHidingClipboardWindow(
+                restoreSettingsFocus: restoreSettingsFocus,
+                completion: completion
+            )
             return
         }
 
@@ -482,16 +487,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             )
         }, completionHandler: { [weak self] in
             guard let self = self else { return }
-            self.clipboardWindow.orderOut(nil)
-            // Restore window level for next time
-            self.clipboardWindow.level = .popUpMenu
-            // Reset UI state to ensure clean state on next open
-            self.clipboardViewModel.resetUIState()
-            if restoreSettingsFocus {
-                self.settingsWindow?.makeKeyAndOrderFront(nil)
-                NSApp.activate(ignoringOtherApps: true)
-            }
+            self.finishHidingClipboardWindow(
+                restoreSettingsFocus: restoreSettingsFocus,
+                completion: completion
+            )
         })
+    }
+
+    private func finishHidingClipboardWindow(
+        restoreSettingsFocus: Bool,
+        completion: (() -> Void)?
+    ) {
+        clipboardWindow.orderOut(nil)
+        clipboardWindow.level = .popUpMenu
+        clipboardViewModel.resetUIState()
+
+        if let completion {
+            completion()
+        } else if restoreSettingsFocus {
+            settingsWindow?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
     }
 
     private func shouldRestoreSettingsFocusAfterDrawerClose() -> Bool {
@@ -511,25 +527,44 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func showSettings() {
-        // Create settings window if it doesn't exist
+        if clipboardWindow.isVisible {
+            hideClipboardWindow { [weak self] in
+                self?.presentSettingsWindow()
+            }
+            return
+        }
+
+        presentSettingsWindow()
+    }
+
+    private func presentSettingsWindow() {
         if settingsWindow == nil {
             let settingsView = SettingsView()
                 .environmentObject(clipboardViewModel)
             let hostingController = NSHostingController(rootView: settingsView)
             let window = NSWindow(contentViewController: hostingController)
             window.title = L10n.string("window.settings.title")
-            window.styleMask = [.titled, .closable, .miniaturizable]
-            window.setContentSize(NSSize(width: 650, height: 500))
+            window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
+            window.toolbarStyle = .unified
+            window.tabbingMode = .disallowed
+            window.setContentSize(NSSize(width: 760, height: 560))
+            window.minSize = NSSize(width: 720, height: 520)
+            window.maxSize = NSSize(width: 980, height: 760)
+            window.level = .floating
+            window.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+            window.hidesOnDeactivate = false
             window.isReleasedWhenClosed = false
             settingsWindow = window
         }
 
-        if let window = settingsWindow {
-            positionSettingsWindow(window)
-        }
+        guard let window = settingsWindow else { return }
 
-        settingsWindow?.makeKeyAndOrderFront(nil)
+        positionSettingsWindow(window)
         NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
     }
 
     private func positionSettingsWindow(_ window: NSWindow) {
