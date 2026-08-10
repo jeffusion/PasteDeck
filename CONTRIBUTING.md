@@ -56,22 +56,24 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 - macOS 13.0 (Ventura) or later
 - Xcode 15.0 or later
 - Swift 5.9 or later
-- An Apple Developer account (for signing and testing)
+- No Apple Developer account is required. Local and CI builds use ad-hoc signing.
 
 ### Getting Started
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/yourusername/PasteDeck.git
+   git clone <repository-url>
    cd PasteDeck
    ```
 
-2. **Follow the setup guide** in `SETUP.md`
+2. **Build, test, and run**:
+   ```bash
+   make test
+   make verify
+   make run
+   ```
 
-3. **Build and run**:
-   - Open `PasteDeck.xcodeproj` in Xcode
-   - Select the PasteDeck scheme
-   - Press ⌘R to build and run
+Open `PasteDeck.xcodeproj` for normal development. `project.yml` is the source configuration for the generated Xcode project; after changing targets, build settings, resources, or package dependencies, run `xcodegen generate` and commit both files.
 
 ### Project Structure
 

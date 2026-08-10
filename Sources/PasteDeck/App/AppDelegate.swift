@@ -20,7 +20,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var clipboardWindow: NSPanel!
     private var clipboardMonitor: ClipboardMonitor!
     private var clipboardViewModel: ClipboardViewModel!
-    private var hotKeyManager = HotKeyManager.shared
+    private lazy var hotKeyManager = HotKeyManager.shared
     private var cancellables = Set<AnyCancellable>()
     private var isShowingWindow = false
     private var globalKeyEventMonitor: Any?
@@ -31,9 +31,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ProcessInfo.processInfo.arguments.contains("--ui-testing")
     }
 
+    private var isUnitTesting: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
     // MARK: - Application Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        guard !isUnitTesting else { return }
+
         // Register default settings before any initialization
         registerDefaultSettings()
 

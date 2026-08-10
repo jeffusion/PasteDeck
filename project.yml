@@ -1,0 +1,73 @@
+name: PasteDeck
+
+options:
+  bundleIdPrefix: com.pastedeck
+  deploymentTarget:
+    macOS: "13.0"
+  createIntermediateGroups: true
+
+packages:
+  KeyboardShortcuts:
+    url: https://github.com/sindresorhus/KeyboardShortcuts
+    exactVersion: 2.3.0
+
+settings:
+  base:
+    MACOSX_DEPLOYMENT_TARGET: "13.0"
+    SWIFT_VERSION: "5.9"
+
+targets:
+  PasteDeck:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/PasteDeck
+      - path: Sources/Resources
+        buildPhase: resources
+      - path: Resources/AppIcon.icns
+        buildPhase: resources
+    dependencies:
+      - package: KeyboardShortcuts
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.pastedeck.app
+        PRODUCT_NAME: PasteDeck
+        INFOPLIST_FILE: Config/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"
+        DEVELOPMENT_TEAM: ""
+        ENABLE_HARDENED_RUNTIME: NO
+        MARKETING_VERSION: 1.0.0
+        CURRENT_PROJECT_VERSION: 1
+  PasteDeckTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/PasteDeckTests
+    dependencies:
+      - target: PasteDeck
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.pastedeck.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/PasteDeck.app/Contents/MacOS/PasteDeck"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+schemes:
+  PasteDeck:
+    build:
+      targets:
+        PasteDeck: all
+        PasteDeckTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - PasteDeckTests
+    profile:
+      config: Release
+    archive:
+      config: Release
