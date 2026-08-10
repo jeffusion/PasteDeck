@@ -20,9 +20,9 @@ if [[ ! "$BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
     exit 2
 fi
 
-case "${CONFIGURATION,,}" in
-    debug) XCODE_CONFIGURATION="Debug" ;;
-    release) XCODE_CONFIGURATION="Release" ;;
+case "$CONFIGURATION" in
+    [Dd][Ee][Bb][Uu][Gg]) XCODE_CONFIGURATION="Debug" ;;
+    [Rr][Ee][Ll][Ee][Aa][Ss][Ee]) XCODE_CONFIGURATION="Release" ;;
     *) echo "Invalid CONFIGURATION: $CONFIGURATION" >&2; exit 2 ;;
 esac
 
