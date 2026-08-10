@@ -11,7 +11,13 @@ import CloudKit
 import SwiftUI
 
 /// Represents a single clipboard item with metadata
-struct ClipItem: Identifiable, Codable, Equatable, Hashable {
+struct ClipItem: Identifiable, Codable, Equatable, Hashable, Sendable {
+    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter
+    }()
+
     // MARK: - Properties
 
     /// Unique identifier
@@ -107,9 +113,7 @@ struct ClipItem: Identifiable, Codable, Equatable, Hashable {
 
     /// Human-readable timestamp
     var relativeTimestamp: String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: createdAt, relativeTo: Date())
+        Self.relativeDateFormatter.localizedString(for: createdAt, relativeTo: Date())
     }
 
     /// Size-friendly description of content size

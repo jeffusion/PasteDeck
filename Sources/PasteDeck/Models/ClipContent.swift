@@ -10,7 +10,7 @@ import Foundation
 import AppKit
 
 /// Represents the different types of content that can be stored in the clipboard
-enum ClipContent: Codable, Equatable {
+enum ClipContent: Codable, Equatable, Sendable {
     case text(String, isRTF: Bool)
     case image(Data, format: ImageFormat)
     case file(URL)
@@ -19,7 +19,7 @@ enum ClipContent: Codable, Equatable {
 
     // MARK: - Supporting Types
 
-    enum ImageFormat: String, Codable {
+    enum ImageFormat: String, Codable, Sendable {
         case png
         case jpeg
         case tiff
@@ -50,7 +50,7 @@ enum ClipContent: Codable, Equatable {
         }
     }
 
-    struct ColorInfo: Codable, Equatable {
+    struct ColorInfo: Codable, Equatable, Sendable {
         let red: Double
         let green: Double
         let blue: Double

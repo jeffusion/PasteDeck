@@ -21,17 +21,22 @@ struct MainWindow: View {
             // Compact header with search
             DrawerHeaderView(isSearchFocused: $isSearchFocused)
 
-            // Main content - horizontal card grid
-            if viewModel.filteredItems.isEmpty {
-                DrawerEmptyStateView()
-            } else {
-                CardGridView(selectedItem: $selectedItem)
+            // Keep the content region stable when filters switch between results and empty state.
+            Group {
+                if viewModel.filteredItems.isEmpty {
+                    DrawerEmptyStateView()
+                } else {
+                    CardGridView(selectedItem: $selectedItem)
+                }
             }
+            .frame(height: 212)
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            // Dismiss search focus when tapping outside
-            isSearchFocused = false
+        .background {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    isSearchFocused = false
+                }
         }
         .environmentObject(focusManager)
         .onChange(of: focusManager.focusClearRequest) { request in
@@ -41,11 +46,7 @@ struct MainWindow: View {
         }
         .onChange(of: isSearchFocused) { focused in
             if !focused {
-                // Reclaim keyboard focus for navigation when search loses focus
-                shouldReclaimKeyboardFocus = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    shouldReclaimKeyboardFocus = false
-                }
+                reclaimKeyboardFocus()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -55,6 +56,7 @@ struct MainWindow: View {
             if selectedItem == nil && !viewModel.filteredItems.isEmpty {
                 selectedItem = viewModel.filteredItems.first
             }
+            reclaimKeyboardFocus()
         }
         .onChange(of: viewModel.filteredItems) { newItems in
             // Keep selection valid
@@ -71,8 +73,11 @@ struct MainWindow: View {
         }
         .onChange(of: viewModel.selectFirstItemTrigger) { trigger in
             // Select first item when drawer is opened
-            if trigger != nil && !viewModel.filteredItems.isEmpty {
-                selectedItem = viewModel.filteredItems.first
+            if trigger != nil {
+                if !viewModel.filteredItems.isEmpty {
+                    selectedItem = viewModel.filteredItems.first
+                }
+                reclaimKeyboardFocus()
             }
         }
         .background(
@@ -87,6 +92,9 @@ struct MainWindow: View {
                     if let item = selectedItem {
                         viewModel.deleteItem(item)
                     }
+                },
+                onSearch: {
+                    isSearchFocused = true
                 },
                 onEscape: {
                     viewModel.onRequestClose?()
@@ -107,6 +115,13 @@ struct MainWindow: View {
             selectedItem = viewModel.filteredItems.first
         }
     }
+
+    private func reclaimKeyboardFocus() {
+        shouldReclaimKeyboardFocus = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            shouldReclaimKeyboardFocus = false
+        }
+    }
 }
 
 // MARK: - Keyboard Event Handler
@@ -116,6 +131,7 @@ struct KeyboardEventHandler: NSViewRepresentable {
     var onRightArrow: () -> Void
     var onReturn: () -> Void
     var onDelete: () -> Void
+    var onSearch: () -> Void
     var onEscape: () -> Void
     var shouldReclaimFocus: Bool
 
@@ -125,6 +141,7 @@ struct KeyboardEventHandler: NSViewRepresentable {
         view.onRightArrow = onRightArrow
         view.onReturn = onReturn
         view.onDelete = onDelete
+        view.onSearch = onSearch
         view.onEscape = onEscape
         return view
     }
@@ -134,6 +151,7 @@ struct KeyboardEventHandler: NSViewRepresentable {
         nsView.onRightArrow = onRightArrow
         nsView.onReturn = onReturn
         nsView.onDelete = onDelete
+        nsView.onSearch = onSearch
         nsView.onEscape = onEscape
 
         // Reclaim focus when requested (to fix keyboard navigation after search unfocus)
@@ -149,11 +167,18 @@ struct KeyboardEventHandler: NSViewRepresentable {
         var onRightArrow: (() -> Void)?
         var onReturn: (() -> Void)?
         var onDelete: (() -> Void)?
+        var onSearch: (() -> Void)?
         var onEscape: (() -> Void)?
 
         override var acceptsFirstResponder: Bool { true }
 
         override func keyDown(with event: NSEvent) {
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            if modifiers.contains(.command), event.charactersIgnoringModifiers?.lowercased() == "f" {
+                onSearch?()
+                return
+            }
+
             switch event.keyCode {
             case 123: // Left arrow
                 onLeftArrow?()
@@ -177,109 +202,139 @@ struct KeyboardEventHandler: NSViewRepresentable {
 struct DrawerHeaderView: View {
     @EnvironmentObject var viewModel: ClipboardViewModel
     @EnvironmentObject var focusManager: FocusManager
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     var isSearchFocused: FocusState<Bool>.Binding
     @State private var isSearchHovered = false
     @State private var isSearchExpanded = false
-    @Namespace private var searchAnimation
+    @State private var collapsedControlsWidth: CGFloat = 0
 
     var body: some View {
         GeometryReader { geometry in
-            HStack(spacing: 12) {
+            HStack(spacing: 0) {
                 Spacer()
-                    .frame(width: isSearchExpanded ? leadingSpacerWidth(containerWidth: geometry.size.width) : nil)
+                    .frame(width: controlsLeadingOffset(containerWidth: geometry.size.width))
 
-                    // Search component (single view with smooth transitions)
-                    HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass")
-                        .font(isSearchExpanded ? .caption : .system(size: 14))
-                        .foregroundColor(.secondary)
+                HStack(spacing: 10) {
+                    // The search keeps the centered group's original leading edge.
+                    ZStack(alignment: .leading) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
 
-                    if isSearchExpanded {
-                        TextField("Search...", text: $viewModel.searchText)
-                            .textFieldStyle(.plain)
-                            .font(.system(size: 12))
-                            .focused(isSearchFocused)
-                            .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                            TextField("搜索...", text: $viewModel.searchText)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 12))
+                                .focused(isSearchFocused)
 
-                        if !viewModel.searchText.isEmpty {
-                            Button(action: { viewModel.searchText = "" }) {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                            if !viewModel.searchText.isEmpty {
+                                Button(action: { viewModel.searchText = "" }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .help("清除搜索")
+                                .accessibilityLabel("清除搜索")
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .opacity(isSearchExpanded ? 1 : 0)
+                        .allowsHitTesting(isSearchExpanded)
+                        .accessibilityHidden(!isSearchExpanded)
+
+                        if !isSearchExpanded {
+                            Button(action: expandSearch) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.primary)
+                                    .frame(width: 34, height: 34)
+                                    .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                             }
                             .buttonStyle(.plain)
-                            .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                            .help("搜索剪贴板历史")
+                            .accessibilityLabel("搜索剪贴板历史")
                         }
                     }
-                }
-                .padding(.horizontal, isSearchExpanded ? 12 : 0)
-                .padding(.vertical, isSearchExpanded ? 6 : 0)
-                .frame(
-                    width: isSearchExpanded ? 200 : 32,
-                    height: 32
-                )
-                .background(.ultraThinMaterial)
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule()
-                        .stroke(
-                            isSearchFocused.wrappedValue ? Color.accentColor :
-                            (isSearchHovered ? Color.secondary.opacity(0.5) : Color.secondary.opacity(0.3)),
-                            lineWidth: isSearchFocused.wrappedValue ? 1.5 : 1
-                        )
-                )
-                .matchedGeometryEffect(id: "searchBox", in: searchAnimation)
-                .onTapGesture {
-                    if !isSearchExpanded {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            isSearchExpanded = true
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            isSearchFocused.wrappedValue = true
-                        }
+                    .frame(width: isSearchExpanded ? 210 : 34, height: 34, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(isSearchHovered ? controlHoverColor : controlSurfaceColor)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(
+                                isSearchFocused.wrappedValue ? Color.accentColor :
+                                    Color.primary.opacity(0.12),
+                                lineWidth: isSearchFocused.wrappedValue ? 1.5 : 0.5
+                            )
+                            .allowsHitTesting(false)
+                    )
+                    .shadow(color: .black.opacity(0.08), radius: 5, y: 2)
+                    .animation(searchAnimation, value: isSearchExpanded)
+                    .onHover { hovering in
+                        isSearchHovered = hovering
                     }
-                }
-                .onHover { hovering in
-                    isSearchHovered = hovering
-                }
 
-                // Content type filter (Paste style)
-                HStack(spacing: isSearchExpanded ? 6 : 8) {
-                    ForEach(ClipItem.ContentFilter.allCases, id: \.self) { filter in
-                        FilterButton(
-                            filter: filter,
-                            isSelected: viewModel.contentFilter == filter,
-                            isCompact: isSearchExpanded,
-                            action: {
-                                // Clear search focus and collapse when filter is clicked
-                                focusManager.clearSearchFocus()
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    viewModel.searchText = ""
-                                    isSearchExpanded = false
+                    // Content type filter (Paste style)
+                    HStack(spacing: 2) {
+                        ForEach(ClipItem.ContentFilter.allCases, id: \.self) { filter in
+                            FilterButton(
+                                filter: filter,
+                                isSelected: viewModel.contentFilter == filter,
+                                action: {
+                                    focusManager.clearSearchFocus()
                                     viewModel.contentFilter = filter
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
+                    .fixedSize()
+                    .padding(3)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(controlSurfaceColor)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(Color.primary.opacity(0.10), lineWidth: 0.5)
+                            .allowsHitTesting(false)
+                    )
+                    .shadow(color: .black.opacity(0.08), radius: 5, y: 2)
+
+                    Text("\(viewModel.filteredItems.count) 项")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .monospacedDigit()
+                        .fixedSize()
+                        .accessibilityLabel("当前显示 \(viewModel.filteredItems.count) 项")
                 }
                 .fixedSize()
+                .background(
+                    GeometryReader { controlsGeometry in
+                        Color.clear.preference(
+                            key: CollapsedControlsWidthPreferenceKey.self,
+                            value: isSearchExpanded ? 0 : controlsGeometry.size.width
+                        )
+                    }
+                )
 
-                // Item count
-                Text("\(viewModel.filteredItems.count) items")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .fixedSize()
-
-                Spacer()
-                    .frame(width: isSearchExpanded ? 0 : nil)
+                Spacer(minLength: 0)
             }
             .frame(height: 44)
         }
         .frame(height: 44)
+        .onPreferenceChange(CollapsedControlsWidthPreferenceKey.self) { width in
+            guard width > 0, !isSearchExpanded else { return }
+            collapsedControlsWidth = width
+        }
         .onChange(of: isSearchFocused.wrappedValue) { focused in
-            // Collapse search if lost focus and no content
-            if !focused && viewModel.searchText.isEmpty {
-                withAnimation(.easeInOut(duration: 0.2)) {
+            if focused && !isSearchExpanded {
+                withAnimation(searchAnimation) {
+                    isSearchExpanded = true
+                }
+            } else if !focused && viewModel.searchText.isEmpty {
+                withAnimation(searchAnimation) {
                     isSearchExpanded = false
                 }
             }
@@ -287,38 +342,59 @@ struct DrawerHeaderView: View {
         .onChange(of: viewModel.searchText) { newText in
             // Expand search if user starts typing (edge case: direct text input)
             if !newText.isEmpty && !isSearchExpanded {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(searchAnimation) {
                     isSearchExpanded = true
                 }
             }
             // Collapse search if text is cleared while not focused
             if newText.isEmpty && !isSearchFocused.wrappedValue && isSearchExpanded {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(searchAnimation) {
                     isSearchExpanded = false
                 }
             }
         }
         .overlay(alignment: .trailing) {
-            // Menu button - overlaid at trailing edge
             DrawerMenuButton(itemCount: viewModel.items.count)
                 .padding(.trailing, 16)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .background(.ultraThinMaterial)
     }
 
-    private func leadingSpacerWidth(containerWidth: CGFloat) -> CGFloat {
-        let searchWidth: CGFloat = 200 // 展开后的搜索框宽度
-        let horizontalPadding: CGFloat = 16 * 2 // 左右各 16 padding
-        let spacing: CGFloat = 12 // HStack spacing
+    private func controlsLeadingOffset(containerWidth: CGFloat) -> CGFloat? {
+        guard collapsedControlsWidth > 0 else { return nil }
+        return max(0, (containerWidth - collapsedControlsWidth) / 2)
+    }
 
-        // 搜索框中心应该在容器中心
-        // leadingSpace + spacing + searchWidth/2 = (containerWidth - horizontalPadding) / 2
-        let availableWidth = containerWidth - horizontalPadding
-        let idealLeadingSpace = (availableWidth - searchWidth) / 2 - spacing
+    private var searchAnimation: Animation? {
+        accessibilityReduceMotion ? nil : .easeInOut(duration: 0.2)
+    }
 
-        return max(0, idealLeadingSpace)
+    private var controlSurfaceColor: Color {
+        Color(nsColor: .controlBackgroundColor)
+    }
+
+    private var controlHoverColor: Color {
+        Color(nsColor: .unemphasizedSelectedContentBackgroundColor)
+    }
+
+    private func expandSearch() {
+        withAnimation(searchAnimation) {
+            isSearchExpanded = true
+        }
+
+        DispatchQueue.main.async {
+            guard isSearchExpanded else { return }
+            isSearchFocused.wrappedValue = true
+        }
+    }
+}
+
+private struct CollapsedControlsWidthPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 
@@ -326,6 +402,7 @@ struct DrawerHeaderView: View {
 
 struct DrawerMenuButton: View {
     let itemCount: Int
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var isHovered = false
 
     var body: some View {
@@ -350,23 +427,35 @@ struct DrawerMenuButton: View {
             }
             .keyboardShortcut("q", modifiers: .command)
         } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(isHovered ? .primary : .secondary)
-                .frame(width: 28, height: 28)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(isHovered ? Color.secondary.opacity(0.15) : Color.clear)
-                )
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(
+                        Color(nsColor: isHovered ?
+                            .unemphasizedSelectedContentBackgroundColor : .controlBackgroundColor)
+                    )
+
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.primary)
+            }
+            .frame(width: 34, height: 34)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
+                    .allowsHitTesting(false)
+            )
+            .shadow(color: .black.opacity(0.08), radius: 5, y: 2)
         }
         .buttonStyle(.plain)
         .fixedSize()
         .menuIndicator(.hidden)
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(accessibilityReduceMotion ? nil : .easeInOut(duration: 0.15)) {
                 isHovered = hovering
             }
         }
+        .help("更多操作")
+        .accessibilityLabel("更多操作")
     }
 
     private func openSettings() {
@@ -384,46 +473,34 @@ struct DrawerMenuButton: View {
 struct FilterButton: View {
     let filter: ClipItem.ContentFilter
     let isSelected: Bool
-    let isCompact: Bool
     let action: () -> Void
     @State private var isHovered = false
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: isCompact ? 0 : 6) {
+            HStack(spacing: 6) {
                 Image(systemName: filter.iconName)
                     .font(.system(size: 12))
 
-                if !isCompact {
-                    Text(filter.displayName)
-                        .font(.system(size: 12, weight: .medium))
-                }
+                Text(filter.displayName)
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .medium))
             }
-            .padding(.horizontal, isCompact ? 0 : 12)
-            .padding(.vertical, isCompact ? 0 : 6)
-            .frame(
-                width: isCompact ? 28 : nil,
-                height: 28
-            )
+            .padding(.horizontal, 10)
+            .frame(height: 28)
             .background(
-                Capsule()
-                    .fill(isSelected ?
-                          Color.accentColor.opacity(0.15) :  // 选中：品牌色背景
-                          (isHovered ?
-                           Color.secondary.opacity(0.08) :  // 悬停：轻微灰色背景
-                           Color.clear))  // 默认：透明背景
-            )
-            .overlay(
-                Capsule()
-                    .stroke(isSelected ?
-                            Color.accentColor.opacity(0.6) :  // 选中：品牌色边框
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(
+                        isSelected ? Color.accentColor :
                             (isHovered ?
-                             Color.secondary.opacity(0.4) :  // 悬停：中等灰色边框
-                             Color.secondary.opacity(0.2)),   // 默认：淡灰色边框
-                     lineWidth: isSelected ? 1.5 : 1)  // 选中状态更粗的边框
+                                Color(nsColor: .unemphasizedSelectedContentBackgroundColor) : Color.clear)
+                    )
             )
+            .foregroundColor(isSelected ? .white : .primary)
         }
         .buttonStyle(.plain)
+        .help(filter.displayName)
+        .accessibilityLabel(filter.displayName)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .onHover { hovering in
             isHovered = hovering
         }
