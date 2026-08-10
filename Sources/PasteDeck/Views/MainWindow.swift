@@ -207,6 +207,7 @@ struct DrawerHeaderView: View {
     @State private var isSearchHovered = false
     @State private var isSearchExpanded = false
     @State private var collapsedControlsWidth: CGFloat = 0
+    @Namespace private var filterSelectionNamespace
 
     var body: some View {
         GeometryReader { geometry in
@@ -282,9 +283,12 @@ struct DrawerHeaderView: View {
                             FilterButton(
                                 filter: filter,
                                 isSelected: viewModel.contentFilter == filter,
+                                selectionNamespace: filterSelectionNamespace,
                                 action: {
                                     focusManager.clearSearchFocus()
-                                    viewModel.contentFilter = filter
+                                    withAnimation(filterSelectionAnimation) {
+                                        viewModel.contentFilter = filter
+                                    }
                                 }
                             )
                         }
@@ -368,6 +372,10 @@ struct DrawerHeaderView: View {
 
     private var searchAnimation: Animation? {
         accessibilityReduceMotion ? nil : .easeInOut(duration: 0.2)
+    }
+
+    private var filterSelectionAnimation: Animation? {
+        accessibilityReduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.86)
     }
 
     private var controlSurfaceColor: Color {
@@ -473,6 +481,7 @@ struct DrawerMenuButton: View {
 struct FilterButton: View {
     let filter: ClipItem.ContentFilter
     let isSelected: Bool
+    let selectionNamespace: Namespace.ID
     let action: () -> Void
     @State private var isHovered = false
 
@@ -482,27 +491,51 @@ struct FilterButton: View {
                 Image(systemName: filter.iconName)
                     .font(.system(size: 12))
 
-                Text(filter.displayName)
-                    .font(.system(size: 11, weight: isSelected ? .semibold : .medium))
+                ZStack {
+                    Text(filter.displayName)
+                        .font(.system(size: 11, weight: .medium))
+                        .opacity(isSelected ? 0 : 1)
+
+                    Text(filter.displayName)
+                        .font(.system(size: 11, weight: .semibold))
+                        .opacity(isSelected ? 1 : 0)
+                }
+                .accessibilityHidden(true)
             }
             .padding(.horizontal, 10)
             .frame(height: 28)
-            .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(
-                        isSelected ? Color.accentColor :
-                            (isHovered ?
-                                Color(nsColor: .unemphasizedSelectedContentBackgroundColor) : Color.clear)
-                    )
-            )
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Color.accentColor)
+                        .matchedGeometryEffect(
+                            id: "filter-selection",
+                            in: selectionNamespace
+                        )
+                        .allowsHitTesting(false)
+                } else if isHovered {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Color(nsColor: .unemphasizedSelectedContentBackgroundColor))
+                        .allowsHitTesting(false)
+                }
+            }
             .foregroundColor(isSelected ? .white : .primary)
         }
         .buttonStyle(.plain)
         .help(filter.displayName)
         .accessibilityLabel(filter.displayName)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .onHover { hovering in
-            isHovered = hovering
+        .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .onContinuousHover { phase in
+            switch phase {
+            case .active:
+                isHovered = true
+                NSCursor.pointingHand.set()
+            case .ended:
+                isHovered = false
+                NSCursor.arrow.set()
+            }
         }
     }
 }
