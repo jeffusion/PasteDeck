@@ -78,15 +78,15 @@ enum ClipContent: Codable, Equatable, Sendable {
     var typeName: String {
         switch self {
         case .text(_, let isRTF):
-            return isRTF ? "Rich Text" : "Text"
+            return L10n.string(isRTF ? "card.type.rich_text" : "card.type.text")
         case .image:
-            return "Image"
+            return L10n.string("card.type.image")
         case .file:
-            return "File"
+            return L10n.string("card.type.file")
         case .multipleFiles:
-            return "Files"
+            return L10n.string("card.type.files")
         case .color:
-            return "Color"
+            return L10n.string("card.type.color")
         }
     }
 
@@ -96,10 +96,10 @@ enum ClipContent: Codable, Equatable, Sendable {
         case .text(let string, _):
             // Return first 100 characters
             let preview = string.prefix(100)
-            return preview.count < string.count ? "\(preview)..." : String(preview)
+            return preview.count < string.count ? "\(preview)…" : String(preview)
 
         case .image(_, let format):
-            return "Image (\(format.rawValue.uppercased()))"
+            return L10n.format("card.preview.image_format", format.rawValue.uppercased())
 
         case .file(let url):
             return url.lastPathComponent
@@ -108,7 +108,12 @@ enum ClipContent: Codable, Equatable, Sendable {
             if urls.count == 1 {
                 return urls[0].lastPathComponent
             } else {
-                return "\(urls.count) files: \(urls.first?.lastPathComponent ?? "") ..."
+                let fileCount = L10n.plural("count.files", count: urls.count)
+                return L10n.format(
+                    "card.preview.multiple_files",
+                    fileCount,
+                    urls.first?.lastPathComponent ?? ""
+                )
             }
 
         case .color(let color):
@@ -178,7 +183,7 @@ enum ClipContent: Codable, Equatable, Sendable {
             }
             let width = representation.pixelsWide
             let height = representation.pixelsHigh
-            return "\(width) × \(height)"
+            return "\(L10n.integer(width)) × \(L10n.integer(height))"
         default:
             return nil
         }
@@ -195,7 +200,7 @@ enum ClipContent: Codable, Equatable, Sendable {
                 let ext = urls[0].pathExtension
                 return ext.isEmpty ? nil : ext.uppercased()
             } else {
-                return "\(urls.count) 个文件"
+                return L10n.plural("count.files", count: urls.count)
             }
         default:
             return nil
@@ -222,7 +227,7 @@ enum ClipContent: Codable, Equatable, Sendable {
         switch self {
         case .text:
             if let count = characterCount {
-                return "\(count) 字符"
+                return L10n.plural("count.characters", count: count)
             }
             return ""
 
@@ -234,10 +239,7 @@ enum ClipContent: Codable, Equatable, Sendable {
 
             // File size
             if let size = actualFileSize {
-                let formatter = ByteCountFormatter()
-                formatter.allowedUnits = [.useKB, .useMB, .useGB]
-                formatter.countStyle = .file
-                parts.append(formatter.string(fromByteCount: size))
+                parts.append(L10n.byteCount(size))
             }
 
             // File extension

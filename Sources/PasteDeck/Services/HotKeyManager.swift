@@ -210,16 +210,19 @@ extension HotKeyManager {
         if let shortcut = KeyboardShortcuts.getShortcut(for: name) {
             return shortcut.description
         }
-        return "Not set"
+        return L10n.string("hotkey.not_set")
     }
 
     /// Get all shortcut descriptions
     @MainActor
     func allShortcutDescriptions() -> [String: String] {
         return [
-            "Show Clipboard": Self.shortcutDescription(for: .showClipboard),
-            "Clear History": Self.shortcutDescription(for: .clearHistory),
-            "Quick Paste": "\(quickPasteModifiers.displayString) + 1...9"
+            L10n.string("settings.shortcuts.show_pastedeck"): Self.shortcutDescription(for: .showClipboard),
+            L10n.string("settings.shortcuts.clear_history"): Self.shortcutDescription(for: .clearHistory),
+            L10n.string("settings.shortcuts.quick_paste"): L10n.format(
+                "settings.shortcuts.quick_paste.preview",
+                quickPasteModifiers.displayString
+            )
         ]
     }
 

@@ -161,12 +161,12 @@ struct WelcomeStepView: View {
                 .foregroundColor(.orange)
 
             // Title
-            Text("需要辅助功能权限")
+            Text(L10n.string("permission.welcome.title"))
                 .font(.title)
                 .fontWeight(.bold)
 
             // Description
-            Text("PasteDeck 需要此权限来实现自动粘贴功能")
+            Text(L10n.string("permission.welcome.description"))
                 .font(.body)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -174,8 +174,16 @@ struct WelcomeStepView: View {
 
             // Feature comparison
             VStack(alignment: .leading, spacing: 12) {
-                FeatureRow(icon: "checkmark.circle.fill", text: "开启权限：双击卡片自动粘贴到当前应用", color: .green)
-                FeatureRow(icon: "info.circle.fill", text: "不开启权限：双击卡片仅复制到剪贴板", color: .blue)
+                FeatureRow(
+                    icon: "checkmark.circle.fill",
+                    text: L10n.string("permission.welcome.enabled"),
+                    color: .green
+                )
+                FeatureRow(
+                    icon: "info.circle.fill",
+                    text: L10n.string("permission.welcome.disabled"),
+                    color: .blue
+                )
             }
             .padding(16)
             .background(Color(nsColor: .controlBackgroundColor))
@@ -186,7 +194,7 @@ struct WelcomeStepView: View {
 
             // Next button
             Button(action: onNext) {
-                Text("开始设置")
+                Text(L10n.string("permission.welcome.start"))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
             }
@@ -210,7 +218,7 @@ struct InstructionStepView: View {
             Spacer()
 
             // Title
-            Text("设置步骤")
+            Text(L10n.string("permission.instructions.title"))
                 .font(.title2)
                 .fontWeight(.bold)
 
@@ -219,21 +227,21 @@ struct InstructionStepView: View {
                 InstructionRow(
                     number: "1",
                     icon: "hand.tap",
-                    title: "点击「打开系统设置」按钮",
+                    title: L10n.string("permission.instructions.step1"),
                     iconColor: .blue
                 )
 
                 InstructionRow(
                     number: "2",
                     icon: "gearshape.2",
-                    title: "在「隐私与安全性」中找到「辅助功能」",
+                    title: L10n.string("permission.instructions.step2"),
                     iconColor: .purple
                 )
 
                 InstructionRow(
                     number: "3",
                     icon: "checkmark.circle",
-                    title: "勾选 PasteDeck",
+                    title: L10n.string("permission.instructions.step3"),
                     iconColor: .green
                 )
             }
@@ -246,11 +254,11 @@ struct InstructionStepView: View {
 
             // Buttons
             HStack(spacing: 12) {
-                Button("返回", action: onBack)
+                Button(L10n.string("common.back"), action: onBack)
                     .keyboardShortcut(.cancelAction)
 
                 Button(action: onOpenSettings) {
-                    Text("打开系统设置")
+                    Text(L10n.string("permission.open_settings"))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -284,24 +292,26 @@ struct WaitingStepView: View {
                 .symbolRenderingMode(.hierarchical)
 
             // Title
-            Text(hasPermission ? "授权成功！" : "等待授权...")
+            Text(L10n.string(
+                hasPermission ? "permission.success.title" : "permission.waiting.title"
+            ))
                 .font(.title2)
                 .fontWeight(.bold)
 
             // Description
             if hasPermission {
-                Text("您现在可以使用自动粘贴功能了")
+                Text(L10n.string("permission.success.description"))
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
 
-                Text("窗口将自动关闭")
+                Text(L10n.string("permission.success.closing"))
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .padding(.top, 4)
             } else {
                 VStack(spacing: 12) {
-                    Text("请在系统设置中勾选 PasteDeck")
+                    Text(L10n.string("permission.waiting.description"))
                         .font(.body)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -309,7 +319,7 @@ struct WaitingStepView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "arrow.clockwise.circle.fill")
                             .foregroundColor(.blue)
-                        Text("正在检测权限状态...")
+                        Text(L10n.string("permission.waiting.checking"))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -321,7 +331,7 @@ struct WaitingStepView: View {
             // Buttons
             HStack(spacing: 12) {
                 if !hasPermission {
-                    Button("返回", action: onBack)
+                    Button(L10n.string("common.back"), action: onBack)
                         .keyboardShortcut(.cancelAction)
 
                     Spacer()
@@ -329,7 +339,7 @@ struct WaitingStepView: View {
                     Spacer()
 
                     Button(action: onComplete) {
-                        Text("完成")
+                        Text(L10n.string("common.done"))
                             .frame(minWidth: 100)
                     }
                     .buttonStyle(.borderedProminent)
@@ -406,7 +416,7 @@ struct PermissionGuideView_Previews: PreviewProvider {
     static var previews: some View {
         Group {
             PermissionGuideView()
-                .previewDisplayName("步骤引导")
+                .previewDisplayName(L10n.string("permission.welcome.title"))
         }
     }
 }

@@ -13,7 +13,7 @@ final class ClipContentTests: XCTestCase {
     func testTextContent() {
         let content = ClipContent.text("Hello", isRTF: false)
 
-        XCTAssertEqual(content.typeName, "Text")
+        XCTAssertEqual(content.typeName, L10n.string("card.type.text"))
         XCTAssertEqual(content.previewString, "Hello")
         XCTAssertEqual(content.iconName, "doc.text")
     }
@@ -21,7 +21,7 @@ final class ClipContentTests: XCTestCase {
     func testRTFContent() {
         let content = ClipContent.text("Hello", isRTF: true)
 
-        XCTAssertEqual(content.typeName, "Rich Text")
+        XCTAssertEqual(content.typeName, L10n.string("card.type.rich_text"))
         XCTAssertEqual(content.iconName, "doc.richtext")
     }
 
@@ -29,7 +29,7 @@ final class ClipContentTests: XCTestCase {
         let url = URL(fileURLWithPath: "/Users/test/file.txt")
         let content = ClipContent.file(url)
 
-        XCTAssertEqual(content.typeName, "File")
+        XCTAssertEqual(content.typeName, L10n.string("card.type.file"))
         XCTAssertEqual(content.previewString, "file.txt")
         XCTAssertEqual(content.iconName, "doc")
     }
@@ -41,8 +41,8 @@ final class ClipContentTests: XCTestCase {
         ]
         let content = ClipContent.multipleFiles(urls)
 
-        XCTAssertEqual(content.typeName, "Files")
-        XCTAssertTrue(content.previewString.contains("2 files"))
+        XCTAssertEqual(content.typeName, L10n.string("card.type.files"))
+        XCTAssertTrue(content.previewString.contains(L10n.plural("count.files", count: 2)))
         XCTAssertEqual(content.iconName, "doc.on.doc")
     }
 
@@ -55,7 +55,7 @@ final class ClipContentTests: XCTestCase {
         )
         let content = ClipContent.color(colorInfo)
 
-        XCTAssertEqual(content.typeName, "Color")
+        XCTAssertEqual(content.typeName, L10n.string("card.type.color"))
         XCTAssertEqual(content.previewString, "#FF0000")
         XCTAssertEqual(content.iconName, "paintpalette")
     }
@@ -86,8 +86,8 @@ final class ClipContentTests: XCTestCase {
         let longText = String(repeating: "A", count: 150)
         let content = ClipContent.text(longText, isRTF: false)
 
-        XCTAssertTrue(content.previewString.hasSuffix("..."))
-        XCTAssertLessThanOrEqual(content.previewString.count, 103) // 100 chars + "..."
+        XCTAssertTrue(content.previewString.hasSuffix("…"))
+        XCTAssertLessThanOrEqual(content.previewString.count, 101) // 100 chars + ellipsis
     }
 
     func testEstimatedSize() {

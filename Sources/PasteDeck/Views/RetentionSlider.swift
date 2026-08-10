@@ -85,40 +85,11 @@ struct RetentionSlider: View {
                     // 静态5标签 (非拖拽状态) - 文字中心对齐到对应刻度位置
                     if !isDragging {
                         ZStack(alignment: .topLeading) {
-                            // "天" - 单字，宽度约16px，居中偏移-8
-                            Text("天")
-                                .font(.caption)
-                                .foregroundColor(.primary.opacity(0.6))
-                                .frame(width: 16)
-                                .offset(x: thumbXPosition(for: 0, width: width) - 8)
-
-                            // "周" - 单字，宽度约16px，居中偏移-8
-                            Text("周")
-                                .font(.caption)
-                                .foregroundColor(.primary.opacity(0.6))
-                                .frame(width: 16)
-                                .offset(x: thumbXPosition(for: 6, width: width) - 8)
-
-                            // "月" - 单字，宽度约16px，居中偏移-8
-                            Text("月")
-                                .font(.caption)
-                                .foregroundColor(.primary.opacity(0.6))
-                                .frame(width: 16)
-                                .offset(x: thumbXPosition(for: 10, width: width) - 8)
-
-                            // "年" - 单字，宽度约16px，居中偏移-8
-                            Text("年")
-                                .font(.caption)
-                                .foregroundColor(.primary.opacity(0.6))
-                                .frame(width: 16)
-                                .offset(x: thumbXPosition(for: 22, width: width) - 8)
-
-                            // "永久" - 双字，宽度约32px，居中偏移-16
-                            Text("永久")
-                                .font(.caption)
-                                .foregroundColor(.primary.opacity(0.6))
-                                .frame(width: 32)
-                                .offset(x: thumbXPosition(for: 24, width: width) - 16)
+                            retentionLabel("retention.unit.days", position: 0, width: width)
+                            retentionLabel("retention.unit.weeks", position: 6, width: width)
+                            retentionLabel("retention.unit.months", position: 10, width: width)
+                            retentionLabel("retention.unit.years", position: 22, width: width)
+                            retentionLabel("retention.forever", position: 24, width: width)
                         }
                         .offset(y: 20)
                         .transition(.opacity)
@@ -152,6 +123,16 @@ struct RetentionSlider: View {
     }
 
     // MARK: - Helper Methods
+
+    private func retentionLabel(_ key: String, position: Int, width: CGFloat) -> some View {
+        Text(L10n.string(key))
+            .font(.caption2)
+            .foregroundColor(.primary.opacity(0.6))
+            .lineLimit(1)
+            .minimumScaleFactor(0.72)
+            .frame(width: 78)
+            .offset(x: thumbXPosition(for: position, width: width) - 39)
+    }
 
     /// 计算滑块头在给定位置的X坐标
     /// - Parameters:
@@ -270,40 +251,40 @@ struct RetentionSlider: View {
         switch position {
         // 1-6天
         case 0...5:
-            return "\(position + 1)天"
+            return L10n.plural("duration.days", count: position + 1)
 
         // 7天 = 1周
         case 6:
-            return "1周"
+            return L10n.plural("duration.weeks", count: 1)
 
         // 2-4周
         case 7...9:
             let weeks = position - 6
-            return "\(weeks)周"
+            return L10n.plural("duration.weeks", count: weeks)
 
         // 4周 = 1个月
         case 10:
-            return "1个月"
+            return L10n.plural("duration.months", count: 1)
 
         // 2-11月
         case 11...21:
             let months = position - 10
-            return "\(months)个月"
+            return L10n.plural("duration.months", count: months)
 
         // 12月 = 1年
         case 22:
-            return "1年"
+            return L10n.plural("duration.years", count: 1)
 
         // 1年
         case 23:
-            return "1年"
+            return L10n.plural("duration.years", count: 1)
 
         // 永久
         case 24:
-            return "永久"
+            return L10n.string("retention.forever")
 
         default:
-            return "1个月"
+            return L10n.plural("duration.months", count: 1)
         }
     }
 

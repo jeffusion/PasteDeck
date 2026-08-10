@@ -18,7 +18,7 @@ final class CardPreviewCacheTests: XCTestCase {
         let firstImage = try XCTUnwrap(first.image)
         let secondImage = try XCTUnwrap(second.image)
 
-        XCTAssertEqual(first.metadata, "1200 × 600")
+        XCTAssertEqual(first.metadata, "\(L10n.integer(1200)) × \(L10n.integer(600))")
         XCTAssertLessThanOrEqual(
             max(firstImage.width, firstImage.height),
             CardPreviewCache.maximumImagePixelSize

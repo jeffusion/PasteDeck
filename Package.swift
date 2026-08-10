@@ -5,6 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "PasteDeck",
+    defaultLocalization: "en",
     platforms: [
         .macOS(.v13)
     ],
@@ -24,7 +25,10 @@ let package = Package(
                 .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts"),
             ],
             path: "Sources",
-            exclude: []
+            exclude: [],
+            resources: [
+                .process("Resources")
+            ]
         ),
         .testTarget(
             name: "PasteDeckTests",
