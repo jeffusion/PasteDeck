@@ -122,6 +122,7 @@ openspec/
 *.xcworkspace/xcuserdata/
 
 # Agents
+.codex/
 .gemini/
 GEMINI.md
 .claude/
