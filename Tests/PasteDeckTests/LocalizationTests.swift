@@ -85,9 +85,12 @@ final class LocalizationTests: XCTestCase {
             let stringsdictURL = try XCTUnwrap(bundle.url(forResource: "Localizable", withExtension: "stringsdict"))
             let ordinary = try dictionary(at: stringsURL)
             let plural = try dictionary(at: stringsdictURL)
+            let sourceDirectory = sourceResourcesURL.appendingPathComponent("\(language.rawValue).lproj")
+            let sourceStringsURL = sourceDirectory.appendingPathComponent("Localizable.strings")
+            let sourceStringsdictURL = sourceDirectory.appendingPathComponent("Localizable.stringsdict")
 
-            XCTAssertEqual(try sourceKeys(at: stringsURL, pattern: #"(?m)^\s*\"((?:\\.|[^\"])*)\"\s*="#).count, ordinary.count)
-            XCTAssertEqual(try sourceKeys(at: stringsdictURL, pattern: #"(?m)^    <key>([^<]+)</key>"#).count, plural.count)
+            XCTAssertEqual(try sourceKeys(at: sourceStringsURL, pattern: #"(?m)^\s*\"((?:\\.|[^\"])*)\"\s*="#).count, ordinary.count)
+            XCTAssertEqual(try sourceKeys(at: sourceStringsdictURL, pattern: #"(?m)^    <key>([^<]+)</key>"#).count, plural.count)
             for (key, value) in ordinary {
                 XCTAssertFalse(key.isEmpty)
                 XCTAssertFalse((value as? String)?.isEmpty ?? true, "Empty translation for \(key)")
@@ -146,6 +149,14 @@ final class LocalizationTests: XCTestCase {
         let data = try Data(contentsOf: url)
         let plist = try PropertyListSerialization.propertyList(from: data, format: nil)
         return try XCTUnwrap(plist as? [String: Any])
+    }
+
+    private var sourceResourcesURL: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/Resources")
     }
 
     private func sourceKeys(at url: URL, pattern: String) throws -> Set<String> {

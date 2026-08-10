@@ -104,10 +104,7 @@ enum L10n {
     }
 
     private static let resourceContainer: Bundle = {
-        if Bundle.main.path(forResource: AppLanguage.english.rawValue, ofType: "lproj") != nil {
-            return Bundle.main
-        }
-        return Bundle.module
+        return Bundle.main
     }()
 
     private static let localizedBundles: [AppLanguage: Bundle] = {

@@ -1,411 +1,101 @@
 # PasteDeck
 
-> A modern, open-source clipboard manager for macOS, inspired by Paste App
+PasteDeck 是一个使用 SwiftUI 和 AppKit 编写的开源 macOS 剪贴板历史工具。
 
-![macOS](https://img.shields.io/badge/macOS-13.0+-blue)
-![Swift](https://img.shields.io/badge/Swift-5.9+-orange)
-![License](https://img.shields.io/badge/license-MIT-green)
+## 功能
 
-## Features
+- 记录文本、图片和文件类型的剪贴板内容
+- 使用全局快捷键 `Command+Shift+V` 打开面板
+- 搜索、收藏、置顶和删除历史记录
+- 支持列表与网格视图
+- 支持排除指定应用
+- 数据保存在本机 Core Data 数据库中，不包含遥测
 
-### 📋 Core Features (MVP)
-- ✅ **Clipboard History**: Automatically captures all copied content (text, images, URLs, files)
-- ✅ **Quick Access**: Global hotkey (`⌘⇧V`) for instant access
-- ✅ **Smart Search**: Real-time search and filtering by content type
-- ✅ **Favorites & Pins**: Save important items permanently
-- ✅ **iCloud Sync**: Seamlessly sync across your Mac devices
-- ✅ **Privacy First**: Excludes password managers and sensitive apps
+当前版本不提供 iCloud 同步，也没有对本地数据库进行额外加密。路线图中的功能不应被视为已实现能力。
 
-### 🎨 User Experience
-- Beautiful native macOS interface with Dark Mode support
-- Floating window with keyboard navigation
-- List and grid view options
-- Visual previews for images and rich content
+## 系统要求
 
-### 🔒 Security & Privacy
-- Local encrypted storage
-- Secure iCloud sync via CloudKit
-- Customizable app exclusion list
-- No telemetry or tracking
+- macOS 13 Ventura 或更高版本
+- 从源码构建需要 Xcode 16 或更高版本
+- 支持 Apple Silicon 和 Intel Mac
 
-## System Requirements
+## 安装发布版
 
-- macOS 13.0 (Ventura) or later
-- Apple Silicon or Intel Mac
-- iCloud account (for sync features)
+从 [GitHub Releases](../../releases/latest) 下载对应版本的 DMG 或 ZIP。发布产物包含 universal binary，可同时运行在 `arm64` 与 `x86_64` Mac 上。
 
-## Installation
+DMG 安装方式：
 
-### Download DMG (Recommended)
+1. 打开 `PasteDeck-x.y.z.dmg`。
+2. 将 `PasteDeck.app` 拖入 `Applications`。
+3. 第一次尝试打开应用。
+4. 如果 macOS 阻止启动，进入“系统设置 -> 隐私与安全性”，在安全性区域确认来源和校验值后选择“仍要打开”。
 
-1. **下载 DMG 文件**
-   - 访问 [Releases 页面](https://github.com/yourusername/PasteDeck/releases)
-   - 下载最新版本的 `PasteDeck-x.x.x.dmg`
+PasteDeck 没有使用 Developer ID 证书，也没有经过 Apple 公证。应用使用 ad-hoc 签名来保证 app bundle 内部结构完整，但该签名不能证明开发者身份，macOS 因此会要求用户手动确认。请只从本仓库的 Releases 下载，并在运行前核对同版本 `.sha256` 文件。
 
-2. **安装应用**
-   - 双击打开下载的 DMG 文件
-   - 将 PasteDeck 图标拖拽到 Applications 文件夹
-
-3. **首次运行设置**（重要⚠️）
-
-   在 macOS Sequoia 及更高版本中，首次运行未公证的应用需要以下步骤：
-
-   a. 双击 Applications 文件夹中的 PasteDeck
-
-   b. 系统会显示"无法打开"的警告对话框 - **这是正常的**
-
-   c. 打开 **系统设置 → 隐私与安全性** (System Settings → Privacy & Security)
-
-   d. 向下滚动到"安全性"(Security) 部分
-
-   e. 找到关于 PasteDeck 的提示，点击 **"仍要打开"** (Open Anyway) 按钮
-
-   f. 输入管理员密码进行授权
-
-   g. 在弹出的确认对话框中点击"打开" (Open)
-
-   h. 完成！后续打开 PasteDeck 不再需要这些步骤
-
-4. **设置辅助功能权限**（可选，用于自动粘贴）
-
-   首次使用自动粘贴功能时，应用会引导你授予辅助功能权限。
-
-**为什么需要手动批准？**
-
-PasteDeck 是开源软件，目前使用 ad-hoc 签名分发（无需付费的 Apple Developer Account $99/年）。macOS Gatekeeper 要求首次运行时手动批准非公证应用。这是一次性操作，完全安全。
-
-### 从源代码构建
-
-**系统要求**：
-- macOS 13.0+
-- Swift 5.9+
-- Xcode 15.0+ (可选，仅用于 Swift 工具链)
-
-**构建步骤**：
-
-1. 克隆仓库：
-   ```bash
-   git clone https://github.com/yourusername/PasteDeck.git
-   cd PasteDeck
-   ```
-
-2. 构建可执行文件：
-   ```bash
-   swift build -c release
-   ```
-
-3. 创建 .app bundle：
-   ```bash
-   make app
-   ```
-   生成的应用位于 `.build/PasteDeck.app`
-
-4. （可选）创建 DMG 分发包：
-   ```bash
-   # 安装依赖
-   brew install create-dmg
-
-   # 构建 DMG
-   make dmg
-   ```
-   生成的 DMG 位于 `PasteDeck-1.0.0.dmg`
-
-### Mac App Store
-暂未上架（未来可能考虑）
-
-## Development Setup
-
-### Prerequisites
-- macOS 13.0+
-- Swift 5.9+
-- Xcode 15.0+ (可选，主要用于 Swift 工具链)
-- Homebrew (用于安装 create-dmg)
-
-### Project Structure
-```
-PasteDeck/
-├── Sources/
-│   └── PasteDeck/
-│       ├── App/                    # Application entry point
-│       │   └── AppDelegate.swift
-│       ├── Models/                 # Data models
-│       │   ├── ClipContent.swift
-│       │   └── ClipItem.swift
-│       ├── Services/               # Business logic services
-│       │   ├── ClipboardMonitor.swift
-│       │   ├── StorageService.swift
-│       │   ├── SoundManager.swift
-│       │   └── HotKeyManager.swift
-│       ├── ViewModels/             # MVVM view models
-│       │   └── ClipboardViewModel.swift
-│       └── Views/                  # SwiftUI views
-│           └── MainWindow.swift
-├── Tests/
-│   └── PasteDeckTests/
-├── Resources/                      # App icon and DMG assets
-├── Design/                         # Design source files
-│   └── PasteDeck.psd               # App icon design source
-├── Docs/                           # Documentation
-│   └── Development/
-│       └── DISTRIBUTION.md         # Distribution guide
-├── Makefile                        # Build system
-├── VERSION                         # Version number (single source of truth)
-├── Package.swift                   # Swift Package Manager manifest
-└── README.md
-```
-
-### 构建项目
-
-**使用 Makefile (推荐)**：
+校验示例：
 
 ```bash
-# 查看所有可用命令
-make help
+shasum -a 256 -c PasteDeck-1.2.3.dmg.sha256
+```
 
-# 创建 .app bundle
-make app
+## 本地开发
 
-# 创建 DMG 分发包
-make dmg
-
-# 运行测试
+```bash
+git clone <repository-url>
+cd PasteDeck
 make test
-
-# 安装到 /Applications
-make install
-
-# 清理构建产物
-make clean
+make app
+make run
 ```
 
-**使用 Swift Package Manager**：
+常用命令：
 
 ```bash
-# 调试构建
-swift build
-
-# 发布构建
-swift build -c release
-
-# 运行测试
-swift test
+make test       # 运行 Swift 测试
+make app        # 生成并 ad-hoc 签名 dist/PasteDeck.app
+make verify     # 验证 Info.plist、资源、架构和代码签名
+make dist       # 生成 ZIP、DMG 和 SHA-256 文件
+make clean      # 清理本地产物
 ```
 
-**使用 Xcode (可选)**：
+也可以直接运行 `./script/build_and_run.sh --verify`，或使用 Codex 项目环境中的 Run 操作。
+
+## 项目结构
+
+```text
+PasteDeck/
+|-- PasteDeck.xcodeproj/           标准 Xcode macOS 应用工程
+|-- project.yml                    XcodeGen 工程源配置
+|-- Config/Info.plist              应用 bundle 元数据
+|-- Sources/PasteDeck/             应用源码
+|-- Sources/Resources/             本地化资源
+|-- Tests/PasteDeckTests/          单元测试
+|-- Resources/                     应用图标
+|-- script/                        构建、打包、验证与运行脚本
+|-- .github/workflows/ci.yml       持续集成
+`-- .github/workflows/release.yml  自动发布
+```
+
+## 发布
+
+推送语义化版本标签会触发 GitHub Actions：
 
 ```bash
-# 生成 Xcode 项目
-swift package generate-xcodeproj
-
-# 使用 Xcode 打开
-open PasteDeck.xcodeproj
+git tag v1.2.3
+git push origin v1.2.3
 ```
 
-### 首次设置
+工作流会运行 Xcode 测试，构建 `arm64 + x86_64` universal app，执行 ad-hoc 签名与结构校验，生成 ZIP/DMG 及 SHA-256 文件，最后创建或更新 GitHub Release。整个流程只使用仓库内置的 `GITHUB_TOKEN`，不需要 Apple 开发者账号或任何 Apple 凭据。
 
-1. 克隆仓库并进入目录
-2. 安装 Git hooks（强制 Conventional Commits 规范）：
-   ```bash
-   ./.githooks/install.sh
-   ```
-3. （可选）安装 commitizen 辅助工具：
-   ```bash
-   # 使用 pipx 安装（推荐）
-   brew install pipx
-   pipx install commitizen
+完整说明见 [分发指南](Docs/Development/DISTRIBUTION.md)，贡献方式见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-   # 或使用 pip
-   pip install commitizen
-   ```
-4. 运行 `swift build` 确保依赖下载完成
-5. 运行 `make app` 创建应用
-6. 测试运行：`make run`
+## 路线图
 
-### 发布新版本
+- iCloud 同步
+- 导入与导出
+- 自动更新
+- 可选的 Developer ID 签名与公证（仅在未来具备开发者账号时）
 
-项目使用 **release-please** 自动化版本管理，基于 Conventional Commits 自动生成版本号和变更日志。
+## 许可证
 
-**自动化发布流程**:
-
-1. **日常开发**：使用规范的提交格式
-   ```bash
-   # 使用 commitizen 辅助工具（推荐）
-   cz commit
-
-   # 或手动编写 Conventional Commits
-   git commit -m "feat(ui): 添加深色模式支持"
-   git commit -m "fix(clipboard): 修复内存泄漏问题"
-   ```
-
-2. **推送到 main 分支**
-   ```bash
-   git push origin main
-   ```
-
-3. **release-please 自动创建 Release PR**
-   - 自动分析提交历史
-   - 根据 feat/fix/BREAKING CHANGE 确定版本号
-   - 生成 CHANGELOG.md
-   - 更新 VERSION 文件
-
-4. **审查并合并 Release PR**
-   - 检查 CHANGELOG 内容是否正确
-   - 确认版本号符合预期
-   - 合并 PR
-
-5. **自动发布**
-   - 自动创建 Git tag（如 v1.1.0）
-   - 自动构建 DMG 文件
-   - 自动创建 GitHub Release
-   - 自动上传 DMG 和 SHA256 校验文件
-
-**版本号规则** (Semantic Versioning):
-- `feat`: 新功能 → MINOR 版本 (1.0.0 → 1.1.0)
-- `fix`: Bug 修复 → PATCH 版本 (1.0.0 → 1.0.1)
-- `BREAKING CHANGE`: 不兼容更改 → MAJOR 版本 (1.0.0 → 2.0.0)
-
-**Breaking Change 示例**:
-```bash
-git commit -m "feat(api)!: 移除旧版剪贴板 API
-
-BREAKING CHANGE: ClipboardManager.legacy() 已被移除，
-请使用 ClipboardManager.modern() 替代"
-```
-
-## Usage
-
-### Default Keyboard Shortcuts
-- `⌘⇧V` - Open PasteDeck window
-- `↑/↓` - Navigate items
-- `Enter` - Copy selected item
-- `⌘Enter` - Copy and paste to active app
-- `⌘F` - Focus search
-- `⌘D` - Delete item
-- `⌘S` - Toggle favorite
-- `Esc` - Close window
-
-### Configuration
-Access preferences via menu bar icon → Preferences:
-- Customize keyboard shortcuts
-- Configure excluded applications
-- Adjust history size (default: 200 items)
-- Enable/disable iCloud sync
-- Choose launch at login
-
-## Architecture
-
-PasteDeck follows Clean Architecture principles with MVVM pattern:
-
-```
-┌─────────────────────────────────────┐
-│  Presentation Layer (SwiftUI)       │
-│  - Views + ViewModels               │
-└─────────────────────────────────────┘
-           ↓
-┌─────────────────────────────────────┐
-│  Business Logic Layer               │
-│  - ClipboardMonitor                 │
-│  - SyncManager                      │
-│  - SearchEngine                     │
-└─────────────────────────────────────┘
-           ↓
-┌─────────────────────────────────────┐
-│  Data Layer                         │
-│  - Core Data                        │
-│  - CloudKit                         │
-│  - FileStorage                      │
-└─────────────────────────────────────┘
-```
-
-### Key Technologies
-- **SwiftUI**: Modern declarative UI framework
-- **AppKit**: System integration (NSPasteboard, NSStatusBar, NSPanel)
-- **Combine**: Reactive programming for data flow
-- **Core Data**: Local data persistence
-- **CloudKit**: iCloud synchronization
-- **KeyboardShortcuts**: Global hotkey management
-
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Workflow
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Code Style
-- Follow Swift API Design Guidelines
-- Use SwiftLint for code formatting
-- Write meaningful commit messages
-- Add tests for new features
-
-## Roadmap
-
-### Phase 1 - MVP ✅
-- [x] Project setup and architecture
-- [x] Clipboard monitoring
-- [x] Core Data setup
-- [x] Basic UI (list view)
-- [x] Global hotkey
-- [x] Search functionality
-
-### Phase 2 - Core Features ✅
-- [x] Image and file preview UI
-- [x] Favorites and pins
-- [x] Menu bar integration
-- [x] Settings panel
-- [x] App exclusion list
-- [x] Keyboard navigation in list
-- [x] Copy and paste workflow
-
-### Phase 3 - iCloud Sync
-- [ ] CloudKit integration
-- [ ] Sync engine
-- [ ] Conflict resolution
-- [ ] Offline support
-
-### Phase 4 - Polish & Release
-- [ ] Performance optimization
-- [ ] App sandboxing for Mac App Store
-- [ ] Icon and branding
-- [ ] User documentation
-- [ ] Mac App Store submission
-
-### Future Enhancements
-- [ ] Smart snippets with variables
-- [ ] Text transformations
-- [ ] Collections/Pinboards
-- [ ] iOS companion app
-- [ ] Advanced search with regex
-- [ ] Export/Import functionality
-
-## Performance Targets
-
-- Window response time: <100ms
-- Clipboard capture delay: <50ms
-- Search response: <200ms
-- Memory usage: <50MB (idle)
-- App startup time: <2s
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Inspired by [Paste App](https://pasteapp.io/)
-- Icons by [SF Symbols](https://developer.apple.com/sf-symbols/)
-- Built with love for the macOS community
-
-## Contact & Support
-
-- **Issues**: [GitHub Issues](https://github.com/yourusername/PasteDeck/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/PasteDeck/discussions)
-- **Twitter**: [@PasteDeckApp](https://twitter.com/PasteDeckApp)
-
----
-
-Made with ❤️ by the PasteDeck community
+[MIT](LICENSE)
