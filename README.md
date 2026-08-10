@@ -58,7 +58,7 @@ make dist       # 生成 ZIP、DMG 和 SHA-256 文件
 make clean      # 清理本地产物
 ```
 
-也可以直接运行 `./script/build_and_run.sh --verify`，或使用 Codex 项目环境中的 Run 操作。
+也可以直接运行 `./script/build_and_run.sh --verify`。
 
 ## 项目结构
 
