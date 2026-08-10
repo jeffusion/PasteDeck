@@ -16,6 +16,19 @@ enum ClipboardAction {
     case cleared   // History cleared
 }
 
+protocol SoundPlayback: AnyObject {
+    var currentTime: TimeInterval { get set }
+    var isPlaying: Bool { get }
+
+    @discardableResult
+    func play() -> Bool
+
+    @discardableResult
+    func stop() -> Bool
+}
+
+extension NSSound: SoundPlayback {}
+
 /// Manages sound effects for clipboard operations
 @MainActor
 class SoundManager {
@@ -25,45 +38,45 @@ class SoundManager {
 
     // MARK: - Properties
 
-    private var lastPlayTime: Date?
-    private let debounceInterval: TimeInterval = 0.5
+    private let sounds: [ClipboardAction: any SoundPlayback]
+    private let isSoundEnabled: () -> Bool
 
     // MARK: - Initialization
 
-    private init() {}
+    private convenience init() {
+        self.init(
+            sounds: [
+                .captured: NSSound(named: "Funk"),
+                .deleted: NSSound(named: "Bottle"),
+                .cleared: NSSound(named: "Submarine")
+            ].compactMapValues { $0 },
+            isSoundEnabled: {
+                UserDefaults.standard.bool(forKey: "soundEnabled")
+            }
+        )
+    }
+
+    init(
+        sounds: [ClipboardAction: any SoundPlayback],
+        isSoundEnabled: @escaping () -> Bool
+    ) {
+        self.sounds = sounds
+        self.isSoundEnabled = isSoundEnabled
+    }
 
     // MARK: - Public Methods
 
     /// Play sound for a clipboard action
     /// - Parameter action: The type of clipboard action
     func playSound(for action: ClipboardAction) {
-        // Check if sound is enabled in settings
-        guard UserDefaults.standard.bool(forKey: "soundEnabled") else {
+        guard isSoundEnabled(), let sound = sounds[action] else {
             return
         }
 
-        // Debounce: Prevent playing sounds too frequently
-        if let lastTime = lastPlayTime,
-           Date().timeIntervalSince(lastTime) < debounceInterval {
-            return
+        if sound.isPlaying {
+            sound.stop()
         }
-
-        // Select and play appropriate sound
-        switch action {
-        case .captured:
-            // Distinctive funky sound for clipboard capture
-            NSSound(named: "Funk")?.play()
-
-        case .deleted:
-            // Bottle sound for deletion
-            NSSound(named: "Bottle")?.play()
-
-        case .cleared:
-            // Submarine sound for clearing action
-            NSSound(named: "Submarine")?.play()
-        }
-
-        // Update last play time
-        lastPlayTime = Date()
+        sound.currentTime = 0
+        sound.play()
     }
 }
