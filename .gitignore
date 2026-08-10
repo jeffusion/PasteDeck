@@ -101,6 +101,9 @@ ApplicationSupport/
 *.dmg
 *.dmg.sha256
 *.pkg
+
+# Local product specifications
+openspec/
 *.zip
 *.tar.gz
 
