@@ -73,6 +73,9 @@
 "settings.general.always_plain_text" = "Always Paste as Plain Text";
 "settings.general.retention" = "Keep History";
 "settings.general.delete_history" = "Delete History…";
+"settings.history.clear.title" = "Clear Clipboard History";
+"settings.history.clear.message" = "Delete all clipboard history except favorites and pinned items? This action cannot be undone.";
+"settings.history.clear.confirm" = "Clear History";
 "settings.error.title" = "Settings Failed";
 "settings.error.launch_at_login" = "PasteDeck could not change the Open at Login setting. Check System Settings permissions.";
 "settings.retention.shorten.title" = "Shorten History Retention";

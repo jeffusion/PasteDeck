@@ -73,6 +73,9 @@
 "settings.general.always_plain_text" = "Всегда вставлять как обычный текст";
 "settings.general.retention" = "Хранение истории";
 "settings.general.delete_history" = "Удалить историю…";
+"settings.history.clear.title" = "Очистить историю буфера обмена";
+"settings.history.clear.message" = "Удалить всю историю, кроме избранных и закреплённых элементов? Это действие нельзя отменить.";
+"settings.history.clear.confirm" = "Очистить историю";
 "settings.error.title" = "Не удалось изменить настройку";
 "settings.error.launch_at_login" = "Не удалось изменить настройку «Открывать при входе». Проверьте разрешения в Системных настройках.";
 "settings.retention.shorten.title" = "Сократить срок хранения";

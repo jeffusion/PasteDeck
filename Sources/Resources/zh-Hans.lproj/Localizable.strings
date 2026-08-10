@@ -73,6 +73,9 @@
 "settings.general.always_plain_text" = "始终以纯文本粘贴";
 "settings.general.retention" = "保留历史";
 "settings.general.delete_history" = "删除历史…";
+"settings.history.clear.title" = "清除剪贴板历史";
+"settings.history.clear.message" = "删除除收藏和置顶项目之外的所有剪贴板历史？此操作无法撤销。";
+"settings.history.clear.confirm" = "清除历史";
 "settings.error.title" = "设置失败";
 "settings.error.launch_at_login" = "无法更改“登录时打开”设置，请检查系统设置中的权限。";
 "settings.retention.shorten.title" = "缩短保留时间";

@@ -73,6 +73,9 @@
 "settings.general.always_plain_text" = "常に標準テキストとしてペースト";
 "settings.general.retention" = "履歴を保持";
 "settings.general.delete_history" = "履歴を削除…";
+"settings.history.clear.title" = "クリップボード履歴を消去";
+"settings.history.clear.message" = "お気に入りとピン留めした項目を除くすべての履歴を削除しますか？この操作は取り消せません。";
+"settings.history.clear.confirm" = "履歴を消去";
 "settings.error.title" = "設定できませんでした";
 "settings.error.launch_at_login" = "「ログイン時に開く」を変更できませんでした。システム設定のアクセス権を確認してください。";
 "settings.retention.shorten.title" = "履歴の保持期間を短縮";
