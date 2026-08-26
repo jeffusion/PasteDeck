@@ -10,6 +10,7 @@ APP_BINARY="$APP_BUNDLE/Contents/MacOS/PasteDeck"
 [[ -d "$APP_BUNDLE" ]] || { echo "App bundle not found: $APP_BUNDLE" >&2; exit 1; }
 [[ -x "$APP_BINARY" ]] || { echo "App executable not found: $APP_BINARY" >&2; exit 1; }
 [[ -f "$APP_BUNDLE/Contents/Resources/AppIcon.icns" ]] || { echo "App icon is missing" >&2; exit 1; }
+[[ -f "$APP_BUNDLE/Contents/Resources/MenuBarIcon.tiff" ]] || { echo "Multi-resolution menu bar icon is missing" >&2; exit 1; }
 [[ -d "$APP_BUNDLE/Contents/Resources/en.lproj" ]] || { echo "PasteDeck localizations are missing" >&2; exit 1; }
 [[ -d "$APP_BUNDLE/Contents/Resources/KeyboardShortcuts_KeyboardShortcuts.bundle" ]] || { echo "KeyboardShortcuts resource bundle is missing" >&2; exit 1; }
 [[ ! -e "$APP_BUNDLE/Contents/embedded.provisionprofile" ]] || { echo "Unexpected provisioning profile found" >&2; exit 1; }
