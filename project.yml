@@ -26,6 +26,10 @@ targets:
         buildPhase: resources
       - path: Resources/AppIcon.icns
         buildPhase: resources
+      - path: Resources/MenuBarIcon.png
+        buildPhase: resources
+      - path: Resources/MenuBarIcon@2x.png
+        buildPhase: resources
     dependencies:
       - package: KeyboardShortcuts
     settings:
