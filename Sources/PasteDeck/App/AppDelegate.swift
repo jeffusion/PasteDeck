@@ -188,12 +188,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
         if let button = statusItem.button {
-            // Set icon - using SF Symbol
-            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
-            button.image = NSImage(
-                systemSymbolName: "doc.on.clipboard",
-                accessibilityDescription: "PasteDeck"
-            )?.withSymbolConfiguration(config)
+            button.image = StatusBarIconProvider.image()
             button.imageScaling = .scaleProportionallyDown
 
             // Both left and right click toggle the drawer
