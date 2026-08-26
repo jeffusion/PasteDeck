@@ -78,15 +78,7 @@ struct SettingsView: View {
 private struct SettingsSidebarHeader: View {
     var body: some View {
         HStack(spacing: 10) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.accentColor)
-
-                Image(systemName: "doc.on.clipboard")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-            }
-            .frame(width: 32, height: 32)
+            AppBrandIcon(size: 32)
             .shadow(color: .black.opacity(0.10), radius: 3, y: 1)
 
             VStack(alignment: .leading, spacing: 1) {
@@ -561,14 +553,7 @@ struct AboutSettingsView: View {
         VStack(spacing: 0) {
             Spacer(minLength: 36)
 
-            ZStack {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.accentColor)
-                Image(systemName: "doc.on.clipboard")
-                    .font(.system(size: 34, weight: .medium))
-                    .foregroundStyle(.white)
-            }
-            .frame(width: 76, height: 76)
+            AppBrandIcon(size: 76)
             .shadow(color: .black.opacity(0.16), radius: 10, y: 4)
 
             Text("PasteDeck")
@@ -591,12 +576,12 @@ struct AboutSettingsView: View {
                 .padding(.top, 12)
 
             HStack(spacing: 10) {
-                Link(destination: URL(string: "https://github.com/example/PasteDeck")!) {
+                Link(destination: AppLinks.repository) {
                     Label(L10n.string("settings.about.github"), systemImage: "link")
                 }
                 .buttonStyle(.bordered)
 
-                Link(destination: URL(string: "https://github.com/example/PasteDeck/issues")!) {
+                Link(destination: AppLinks.issues) {
                     Label(L10n.string("settings.about.report_issue"), systemImage: "exclamationmark.bubble")
                 }
                 .buttonStyle(.bordered)
