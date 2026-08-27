@@ -278,7 +278,7 @@ class StorageService: ObservableObject {
         }
     }
 
-    /// Enforce maximum history size by deleting oldest non-permanent items
+    /// Enforce maximum history size, deleting ordinary items before permanent items
     @discardableResult
     func enforceMaxHistory(maxItems: Int) -> Int {
         // Count total items
@@ -286,16 +286,25 @@ class StorageService: ObservableObject {
 
         guard totalCount > maxItems else { return 0 }
 
-        // Fetch items to delete (oldest first, excluding favorites and pinned)
-        let request = ClipItemEntity.fetchRequest()
-        request.predicate = NSPredicate(format: "isFavorite == NO AND isPinned == NO")
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \ClipItemEntity.createdAt, ascending: true)]
-
         let toDeleteCount = totalCount - maxItems
-        request.fetchLimit = toDeleteCount
 
         do {
-            let entities = try context.fetch(request)
+            let ordinaryRequest = ClipItemEntity.fetchRequest()
+            ordinaryRequest.predicate = NSPredicate(format: "isFavorite == NO AND isPinned == NO")
+            ordinaryRequest.sortDescriptors = [NSSortDescriptor(keyPath: \ClipItemEntity.createdAt, ascending: true)]
+            ordinaryRequest.fetchLimit = toDeleteCount
+
+            var entities = try context.fetch(ordinaryRequest)
+            let remainingCount = toDeleteCount - entities.count
+
+            if remainingCount > 0 {
+                let permanentRequest = ClipItemEntity.fetchRequest()
+                permanentRequest.predicate = NSPredicate(format: "isFavorite == YES OR isPinned == YES")
+                permanentRequest.sortDescriptors = [NSSortDescriptor(keyPath: \ClipItemEntity.createdAt, ascending: true)]
+                permanentRequest.fetchLimit = remainingCount
+                entities += try context.fetch(permanentRequest)
+            }
+
             for entity in entities {
                 context.delete(entity)
             }
