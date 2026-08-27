@@ -322,11 +322,11 @@ struct DrawerHeaderView: View {
                     )
                     .shadow(color: .black.opacity(0.08), radius: 5, y: 2)
 
-                    Text(L10n.integer(viewModel.filteredItems.count))
+                    Text(L10n.plural("count.items", count: viewModel.filteredItems.count))
                     .monospacedDigit()
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.secondary)
-                    .frame(width: 40, alignment: .center)
+                    .frame(minWidth: 40, alignment: .center)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(
                         L10n.format(
