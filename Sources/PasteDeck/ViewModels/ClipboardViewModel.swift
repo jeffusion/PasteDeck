@@ -41,7 +41,7 @@ class ClipboardViewModel: ObservableObject {
 
     // MARK: - Constants
 
-    private let defaultMaxHistorySize = 200
+    private let defaultMaxHistorySize = 20_000
 
     // MARK: - Initialization
 
@@ -84,6 +84,8 @@ class ClipboardViewModel: ObservableObject {
     }
 
     private func loadInitialData() {
+        _ = storageService.enforceMaxHistory(maxItems: maxHistorySize)
+
         // Load persisted data from Core Data
         items = storageService.fetchAll()
         applyFilters()
@@ -268,13 +270,6 @@ class ClipboardViewModel: ObservableObject {
         } else {
             // Add new item
             items.insert(clipItem, at: 0)
-
-            // Enforce max history size (keep favorites and pinned)
-            if items.count > maxHistorySize {
-                let itemsToRemove = items.drop(while: { $0.isPermanent }).dropFirst(maxHistorySize)
-                let idsToRemove = Set(itemsToRemove.map { $0.id })
-                items.removeAll { idsToRemove.contains($0.id) && !$0.isPermanent }
-            }
         }
 
         saveItems()
@@ -333,7 +328,9 @@ class ClipboardViewModel: ObservableObject {
         _ = storageService.save(items)
 
         // Enforce max history
-        _ = storageService.enforceMaxHistory(maxItems: maxHistorySize)
+        if storageService.enforceMaxHistory(maxItems: maxHistorySize) > 0 {
+            items = storageService.fetchAll()
+        }
     }
 
     private func simulatePaste() {

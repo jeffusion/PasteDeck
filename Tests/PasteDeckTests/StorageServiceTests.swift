@@ -239,24 +239,68 @@ final class StorageServiceTests: XCTestCase {
         XCTAssertEqual(storageService.count(), 5)
     }
 
-    func testEnforceMaxHistoryPreservesFavorites() {
-        // Create items
-        for i in 1...5 {
-            storageService.save(ClipItem(content: .text("Item \(i)", isRTF: false)))
+    func testEnforceMaxHistoryDeletesOldestOrdinaryItemsFirst() {
+        let now = Date()
+        let favorite = ClipItem(content: .text("Favorite", isRTF: false), createdAt: now.addingTimeInterval(-500), isFavorite: true)
+        let pinned = ClipItem(content: .text("Pinned", isRTF: false), createdAt: now.addingTimeInterval(-400), isPinned: true)
+        let oldestOrdinary = ClipItem(content: .text("Oldest ordinary", isRTF: false), createdAt: now.addingTimeInterval(-300))
+        let middleOrdinary = ClipItem(content: .text("Middle ordinary", isRTF: false), createdAt: now.addingTimeInterval(-200))
+        let newestOrdinary = ClipItem(content: .text("Newest ordinary", isRTF: false), createdAt: now.addingTimeInterval(-100))
+        storageService.save([favorite, pinned, oldestOrdinary, middleOrdinary, newestOrdinary])
+
+        let deleted = storageService.enforceMaxHistory(maxItems: 3)
+        let remainingIDs = Set(storageService.fetchAll().map(\.id))
+
+        XCTAssertEqual(deleted, 2)
+        XCTAssertEqual(remainingIDs, Set([favorite.id, pinned.id, newestOrdinary.id]))
+    }
+
+    func testEnforceMaxHistoryDeletesOldestPermanentItemsWhenNeeded() {
+        let now = Date()
+        let items = (0..<4).map { index in
+            ClipItem(
+                content: .text("Permanent \(index)", isRTF: false),
+                createdAt: now.addingTimeInterval(TimeInterval(index - 4)),
+                isFavorite: index.isMultiple(of: 2),
+                isPinned: !index.isMultiple(of: 2)
+            )
         }
+        storageService.save(items)
 
-        // Create a favorite
-        var favoriteItem = ClipItem(content: .text("Favorite", isRTF: false))
-        favoriteItem.isFavorite = true
-        storageService.save(favoriteItem)
+        let deleted = storageService.enforceMaxHistory(maxItems: 2)
+        let remainingIDs = Set(storageService.fetchAll().map(\.id))
 
-        XCTAssertEqual(storageService.count(), 6)
+        XCTAssertEqual(deleted, 2)
+        XCTAssertEqual(storageService.count(), 2)
+        XCTAssertEqual(remainingIDs, Set(items.suffix(2).map(\.id)))
+    }
 
-        // Enforce max of 3 - should keep favorite
-        storageService.enforceMaxHistory(maxItems: 3)
+    func testDeleteItemsOlderThanPreservesFavoriteAndPinnedItems() {
+        let oldDate = Date().addingTimeInterval(-60 * 24 * 60 * 60)
+        let ordinary = ClipItem(content: .text("Ordinary", isRTF: false), createdAt: oldDate)
+        let favorite = ClipItem(content: .text("Favorite", isRTF: false), createdAt: oldDate, isFavorite: true)
+        let pinned = ClipItem(content: .text("Pinned", isRTF: false), createdAt: oldDate, isPinned: true)
+        let recent = ClipItem(content: .text("Recent", isRTF: false))
+        storageService.save([ordinary, favorite, pinned, recent])
 
-        let favorites = storageService.fetchFavorites()
-        XCTAssertEqual(favorites.count, 1)
+        let deleted = storageService.deleteItemsOlderThan(days: 30, keepPermanent: true)
+        let remainingIDs = Set(storageService.fetchAll().map(\.id))
+
+        XCTAssertEqual(deleted, 1)
+        XCTAssertEqual(remainingIDs, Set([favorite.id, pinned.id, recent.id]))
+    }
+
+    func testDeleteItemsOlderThanForeverDeletesNothing() {
+        let oldItem = ClipItem(
+            content: .text("Old", isRTF: false),
+            createdAt: Date().addingTimeInterval(-365 * 24 * 60 * 60)
+        )
+        storageService.save(oldItem)
+
+        let deleted = storageService.deleteItemsOlderThan(days: -1, keepPermanent: true)
+
+        XCTAssertEqual(deleted, 0)
+        XCTAssertEqual(storageService.count(), 1)
     }
 
     // MARK: - Statistics Tests

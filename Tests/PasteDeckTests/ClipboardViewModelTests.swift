@@ -45,6 +45,39 @@ final class ClipboardViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.searchText, "")
     }
 
+    func testInitializationEnforcesMaxHistory() {
+        let now = Date()
+        let favorite = ClipItem(content: .text("Favorite", isRTF: false), createdAt: now.addingTimeInterval(-40), isFavorite: true)
+        let oldestOrdinary = ClipItem(content: .text("Oldest", isRTF: false), createdAt: now.addingTimeInterval(-30))
+        let middleOrdinary = ClipItem(content: .text("Middle", isRTF: false), createdAt: now.addingTimeInterval(-20))
+        let newestOrdinary = ClipItem(content: .text("Newest", isRTF: false), createdAt: now.addingTimeInterval(-10))
+        storageService.save([favorite, oldestOrdinary, middleOrdinary, newestOrdinary])
+
+        viewModel = ClipboardViewModel(monitor: monitor, storageService: storageService, maxHistorySize: 3)
+        let itemIDs = Set(viewModel.items.map(\.id))
+
+        XCTAssertEqual(storageService.count(), 3)
+        XCTAssertEqual(itemIDs, Set([favorite.id, middleOrdinary.id, newestOrdinary.id]))
+    }
+
+    func testSaveItemsKeepsViewModelAndStorageSynchronizedAfterCapDeletion() {
+        let now = Date()
+        let favorite = ClipItem(content: .text("Favorite", isRTF: false), createdAt: now.addingTimeInterval(-40), isFavorite: true)
+        let oldestOrdinary = ClipItem(content: .text("Oldest", isRTF: false), createdAt: now.addingTimeInterval(-30))
+        let middleOrdinary = ClipItem(content: .text("Middle", isRTF: false), createdAt: now.addingTimeInterval(-20))
+        let newestOrdinary = ClipItem(content: .text("Newest", isRTF: false), createdAt: now.addingTimeInterval(-10))
+        viewModel = ClipboardViewModel(monitor: monitor, storageService: storageService, maxHistorySize: 3)
+        viewModel.items = [favorite, oldestOrdinary, middleOrdinary, newestOrdinary]
+
+        viewModel.addTag("saved", to: newestOrdinary)
+
+        let viewModelIDs = Set(viewModel.items.map(\.id))
+        let storedIDs = Set(storageService.fetchAll().map(\.id))
+        XCTAssertEqual(viewModel.items.count, 3)
+        XCTAssertEqual(viewModelIDs, storedIDs)
+        XCTAssertEqual(viewModelIDs, Set([favorite.id, middleOrdinary.id, newestOrdinary.id]))
+    }
+
     // MARK: - Copy Operations Tests
 
     func testCopyItem() {
