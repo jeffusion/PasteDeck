@@ -120,6 +120,8 @@ struct GeneralSettingsView: View {
     @AppStorage("showInMenuBar") private var showInMenuBar = true
     @AppStorage("soundEnabled") private var soundEnabled = true
     @AppStorage("pasteMode") private var pasteMode = "activeApp"
+    @AppStorage(MotionStyle.preferenceKey) private var motionStyle = MotionStyle.defaultValue.rawValue
+    @AppStorage(MotionSpeed.preferenceKey) private var motionSpeed = MotionSpeed.defaultValue.rawValue
     @AppStorage("alwaysPastePlainText") private var alwaysPastePlainText = false
     @AppStorage("historyRetentionDays") private var historyRetentionDays = 30
 
@@ -159,6 +161,38 @@ struct GeneralSettingsView: View {
                     title: L10n.string("settings.general.sound"),
                     isOn: $soundEnabled
                 )
+            }
+
+            SettingsSection(title: L10n.string("settings.general.motion_style")) {
+                VStack(alignment: .leading, spacing: 10) {
+                    MotionStyleSelector(
+                        selection: motionStyleSelection,
+                        title: { motionStyleTitle(for: $0) }
+                    )
+                    .frame(maxWidth: .infinity, alignment: .center)
+
+                    Text(L10n.string("settings.general.motion_style.description"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.vertical, 13)
+            }
+
+            SettingsSection(title: L10n.string("settings.general.motion_speed")) {
+                VStack(alignment: .leading, spacing: 10) {
+                    MotionSpeedSelector(
+                        selection: motionSpeedSelection,
+                        title: { motionSpeedTitle(for: $0) }
+                    )
+                    .frame(maxWidth: .infinity, alignment: .center)
+
+                    Text(L10n.string("settings.general.motion_speed.description"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.vertical, 13)
             }
 
             SettingsSection(title: L10n.string("settings.general.paste_items")) {
@@ -208,6 +242,8 @@ struct GeneralSettingsView: View {
                 launchAtLogin = actualState
             }
             previousRetentionDays = historyRetentionDays
+            normalizeMotionStyle()
+            normalizeMotionSpeed()
         }
         .onChange(of: launchAtLogin) { newValue in
             let actualState = LaunchAtLoginService.shared.sync(with: newValue)
@@ -230,6 +266,12 @@ struct GeneralSettingsView: View {
                     }
                 }
             }
+        }
+        .onChange(of: motionStyle) { _ in
+            normalizeMotionStyle()
+        }
+        .onChange(of: motionSpeed) { _ in
+            normalizeMotionSpeed()
         }
         .alert(L10n.string("settings.error.title"), isPresented: $showErrorAlert) {
             Button(L10n.string("common.ok"), role: .cancel) {}
@@ -277,6 +319,56 @@ struct GeneralSettingsView: View {
                 "settings.general.paste_active_app.description" :
                 "settings.general.paste_clipboard.description"
         )
+    }
+
+    private var motionStyleSelection: Binding<MotionStyle> {
+        Binding(
+            get: { MotionStyle.current(in: .standard) },
+            set: { motionStyle = $0.rawValue }
+        )
+    }
+
+    private func motionStyleTitle(for style: MotionStyle) -> String {
+        switch style {
+        case .nativeSnappy:
+            return L10n.string("settings.general.motion_style.native_snappy")
+        case .spatialSpring:
+            return L10n.string("settings.general.motion_style.spatial_spring")
+        case .softMaterial:
+            return L10n.string("settings.general.motion_style.soft_material")
+        }
+    }
+
+    private func normalizeMotionStyle() {
+        let normalized = MotionStyle.current(in: .standard).rawValue
+        if motionStyle != normalized {
+            motionStyle = normalized
+        }
+    }
+
+    private var motionSpeedSelection: Binding<MotionSpeed> {
+        Binding(
+            get: { MotionSpeed.current(in: .standard) },
+            set: { motionSpeed = $0.rawValue }
+        )
+    }
+
+    private func motionSpeedTitle(for speed: MotionSpeed) -> String {
+        switch speed {
+        case .fast:
+            return L10n.string("settings.general.motion_speed.fast")
+        case .normal:
+            return L10n.string("settings.general.motion_speed.normal")
+        case .slow:
+            return L10n.string("settings.general.motion_speed.slow")
+        }
+    }
+
+    private func normalizeMotionSpeed() {
+        let normalized = MotionSpeed.current(in: .standard).rawValue
+        if motionSpeed != normalized {
+            motionSpeed = normalized
+        }
     }
 }
 
@@ -614,8 +706,8 @@ private struct PasteModeSelector: View {
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
     var body: some View {
-        HStack(spacing: 3) {
-            PasteModeSegment(
+        SettingsSegmentedControl(accessibilityLabel: L10n.string("settings.general.paste_items")) {
+            SettingsSegment(
                 title: L10n.string("settings.general.paste_active_app"),
                 icon: "cursorarrow.click.2",
                 isSelected: selection == "activeApp"
@@ -623,13 +715,104 @@ private struct PasteModeSelector: View {
                 select("activeApp")
             }
 
-            PasteModeSegment(
+            SettingsSegment(
                 title: L10n.string("settings.general.paste_clipboard"),
                 icon: "clipboard",
                 isSelected: selection == "clipboard"
             ) {
                 select("clipboard")
             }
+        }
+    }
+
+    private func select(_ mode: String) {
+        withAnimation(accessibilityReduceMotion ? nil : .easeInOut(duration: 0.15)) {
+            selection = mode
+        }
+    }
+}
+
+private struct MotionStyleSelector: View {
+    @Binding var selection: MotionStyle
+    let title: (MotionStyle) -> String
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+
+    var body: some View {
+        SettingsSegmentedControl(accessibilityLabel: L10n.string("settings.general.motion_style")) {
+            ForEach(MotionStyle.allCases) { style in
+                SettingsSegment(
+                    title: title(style),
+                    icon: icon(for: style),
+                    isSelected: selection == style
+                ) {
+                    select(style)
+                }
+            }
+        }
+    }
+
+    private func icon(for style: MotionStyle) -> String {
+        switch style {
+        case .nativeSnappy:
+            return "bolt.fill"
+        case .spatialSpring:
+            return "wave.3.right"
+        case .softMaterial:
+            return "circle.lefthalf.filled"
+        }
+    }
+
+    private func select(_ style: MotionStyle) {
+        withAnimation(accessibilityReduceMotion ? nil : .easeInOut(duration: 0.15)) {
+            selection = style
+        }
+    }
+}
+
+private struct MotionSpeedSelector: View {
+    @Binding var selection: MotionSpeed
+    let title: (MotionSpeed) -> String
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+
+    var body: some View {
+        SettingsSegmentedControl(accessibilityLabel: L10n.string("settings.general.motion_speed")) {
+            ForEach(MotionSpeed.allCases) { speed in
+                SettingsSegment(
+                    title: title(speed),
+                    icon: icon(for: speed),
+                    isSelected: selection == speed
+                ) {
+                    select(speed)
+                }
+            }
+        }
+    }
+
+    private func icon(for speed: MotionSpeed) -> String {
+        switch speed {
+        case .fast:
+            return "hare.fill"
+        case .normal:
+            return "gauge.with.dots.needle.50percent"
+        case .slow:
+            return "tortoise.fill"
+        }
+    }
+
+    private func select(_ speed: MotionSpeed) {
+        withAnimation(accessibilityReduceMotion ? nil : .easeInOut(duration: 0.15)) {
+            selection = speed
+        }
+    }
+}
+
+private struct SettingsSegmentedControl<Content: View>: View {
+    let accessibilityLabel: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        HStack(spacing: 3) {
+            content
         }
         .padding(3)
         .frame(width: 390)
@@ -642,17 +825,11 @@ private struct PasteModeSelector: View {
                 .stroke(Color.primary.opacity(0.10), lineWidth: 0.5)
         )
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(L10n.string("settings.general.paste_items"))
-    }
-
-    private func select(_ mode: String) {
-        withAnimation(accessibilityReduceMotion ? nil : .easeInOut(duration: 0.15)) {
-            selection = mode
-        }
+        .accessibilityLabel(accessibilityLabel)
     }
 }
 
-private struct PasteModeSegment: View {
+private struct SettingsSegment: View {
     let title: String
     let icon: String
     let isSelected: Bool

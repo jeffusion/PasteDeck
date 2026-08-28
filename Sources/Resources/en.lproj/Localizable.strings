@@ -65,6 +65,16 @@
 "settings.general.synced" = "Synced";
 "settings.general.show_menu_bar" = "Show in Menu Bar";
 "settings.general.sound" = "Sound Effects";
+"settings.general.motion_style" = "Motion Style";
+"settings.general.motion_style.description" = "Choose the motion feel used across PasteDeck.";
+"settings.general.motion_style.native_snappy" = "Native Snappy";
+"settings.general.motion_style.spatial_spring" = "Spatial Spring";
+"settings.general.motion_style.soft_material" = "Soft Material";
+"settings.general.motion_speed" = "Motion Speed";
+"settings.general.motion_speed.description" = "Choose how quickly motion plays across PasteDeck.";
+"settings.general.motion_speed.fast" = "Fast";
+"settings.general.motion_speed.normal" = "Normal";
+"settings.general.motion_speed.slow" = "Slow";
 "settings.general.paste_items" = "Paste Items";
 "settings.general.paste_active_app" = "To the Active App";
 "settings.general.paste_active_app.description" = "Paste the selected item directly into the app you are currently using.";

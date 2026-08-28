@@ -203,6 +203,8 @@ struct DrawerHeaderView: View {
     @EnvironmentObject var viewModel: ClipboardViewModel
     @EnvironmentObject var focusManager: FocusManager
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @AppStorage(MotionStyle.preferenceKey) private var motionStylePreference = MotionStyle.nativeSnappy.rawValue
+    @AppStorage(MotionSpeed.preferenceKey) private var motionSpeedPreference = MotionSpeed.normal.rawValue
     var isSearchFocused: FocusState<Bool>.Binding
     @State private var isSearchHovered = false
     @State private var isSearchExpanded = false
@@ -393,11 +395,37 @@ struct DrawerHeaderView: View {
     }
 
     private var searchAnimation: Animation? {
-        accessibilityReduceMotion ? nil : .easeInOut(duration: 0.2)
+        guard !accessibilityReduceMotion else { return nil }
+
+        switch motionStyle {
+        case .nativeSnappy:
+            return .timingCurve(0.16, 1, 0.3, 1, duration: MotionTiming.search * durationMultiplier)
+        case .spatialSpring:
+            return .timingCurve(0.34, 1.36, 0.64, 1, duration: MotionTiming.search * durationMultiplier)
+        case .softMaterial:
+            return .easeInOut(duration: MotionTiming.search * durationMultiplier)
+        }
     }
 
     private var filterSelectionAnimation: Animation? {
-        accessibilityReduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.86)
+        guard !accessibilityReduceMotion else { return nil }
+
+        switch motionStyle {
+        case .nativeSnappy:
+            return .easeOut(duration: MotionTiming.filter * durationMultiplier)
+        case .spatialSpring:
+            return .timingCurve(0.34, 1.36, 0.64, 1, duration: MotionTiming.filter * durationMultiplier)
+        case .softMaterial:
+            return .easeInOut(duration: MotionTiming.filter * durationMultiplier)
+        }
+    }
+
+    private var motionStyle: MotionStyle {
+        MotionStyle(rawValue: motionStylePreference) ?? .nativeSnappy
+    }
+
+    private var durationMultiplier: Double {
+        (MotionSpeed(rawValue: motionSpeedPreference) ?? .normal).durationMultiplier
     }
 
     private var controlSurfaceColor: Color {
