@@ -65,6 +65,16 @@
 "settings.general.synced" = "同期済み";
 "settings.general.show_menu_bar" = "メニューバーに表示";
 "settings.general.sound" = "サウンドエフェクト";
+"settings.general.motion_style" = "モーションスタイル";
+"settings.general.motion_style.description" = "PasteDeck 全体で使う動きの感触を選択します。";
+"settings.general.motion_style.native_snappy" = "ネイティブ高速";
+"settings.general.motion_style.spatial_spring" = "空間スプリング";
+"settings.general.motion_style.soft_material" = "ソフトマテリアル";
+"settings.general.motion_speed" = "モーション速度";
+"settings.general.motion_speed.description" = "PasteDeck 全体のモーション速度を選択します。";
+"settings.general.motion_speed.fast" = "高速";
+"settings.general.motion_speed.normal" = "標準";
+"settings.general.motion_speed.slow" = "低速";
 "settings.general.paste_items" = "項目をペースト";
 "settings.general.paste_active_app" = "使用中のアプリへ";
 "settings.general.paste_active_app.description" = "選択した項目を、現在使用中のアプリに直接ペーストします。";

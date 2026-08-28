@@ -65,6 +65,16 @@
 "settings.general.synced" = "已同步";
 "settings.general.show_menu_bar" = "显示在菜单栏";
 "settings.general.sound" = "音效";
+"settings.general.motion_style" = "动效风格";
+"settings.general.motion_style.description" = "选择 PasteDeck 使用的动效感受。";
+"settings.general.motion_style.native_snappy" = "快速原生";
+"settings.general.motion_style.spatial_spring" = "空间弹性";
+"settings.general.motion_style.soft_material" = "柔和材质";
+"settings.general.motion_speed" = "动效速度";
+"settings.general.motion_speed.description" = "选择 PasteDeck 中动效的播放速度。";
+"settings.general.motion_speed.fast" = "快速";
+"settings.general.motion_speed.normal" = "正常";
+"settings.general.motion_speed.slow" = "慢速";
 "settings.general.paste_items" = "粘贴项目";
 "settings.general.paste_active_app" = "到当前活跃 App";
 "settings.general.paste_active_app.description" = "将所选项目直接粘贴到当前正在使用的 App。";

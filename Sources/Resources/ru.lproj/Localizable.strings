@@ -65,6 +65,16 @@
 "settings.general.synced" = "Синхронизировано";
 "settings.general.show_menu_bar" = "Показывать в строке меню";
 "settings.general.sound" = "Звуковые эффекты";
+"settings.general.motion_style" = "Стиль движения";
+"settings.general.motion_style.description" = "Выберите характер движения для PasteDeck.";
+"settings.general.motion_style.native_snappy" = "Нативная динамика";
+"settings.general.motion_style.spatial_spring" = "Пространственная пружина";
+"settings.general.motion_style.soft_material" = "Мягкий материал";
+"settings.general.motion_speed" = "Скорость движения";
+"settings.general.motion_speed.description" = "Выберите скорость движения в PasteDeck.";
+"settings.general.motion_speed.fast" = "Быстро";
+"settings.general.motion_speed.normal" = "Обычно";
+"settings.general.motion_speed.slow" = "Медленно";
 "settings.general.paste_items" = "Вставка элементов";
 "settings.general.paste_active_app" = "В активное приложение";
 "settings.general.paste_active_app.description" = "Вставлять выбранный элемент прямо в используемое приложение.";

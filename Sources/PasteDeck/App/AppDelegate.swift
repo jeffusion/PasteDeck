@@ -22,10 +22,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var clipboardViewModel: ClipboardViewModel!
     private lazy var hotKeyManager = HotKeyManager.shared
     private var cancellables = Set<AnyCancellable>()
-    private var isShowingWindow = false
+    private var drawerAnimationGeneration = 0
     private var globalKeyEventMonitor: Any?
     private var globalMouseEventMonitor: Any?
     private var settingsWindow: NSWindow?
+    private weak var drawerVisualEffectView: NSVisualEffectView?
 
     private var isUITesting: Bool {
         ProcessInfo.processInfo.arguments.contains("--ui-testing")
@@ -95,6 +96,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "showInMenuBar": true,          // Menu bar icon visible by default
             "soundEnabled": true,
             "pasteMode": "activeApp",
+            MotionStyle.preferenceKey: MotionStyle.nativeSnappy.rawValue,
+            MotionSpeed.preferenceKey: MotionSpeed.normal.rawValue,
             "alwaysPastePlainText": false,
             "historyRetentionDays": 30
         ]
@@ -281,8 +284,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         hostingController.view.autoresizingMask = [.width, .height]
         visualEffectView.addSubview(hostingController.view)
 
-        // Add visual effect view to clipping container
         clippingContainer.addSubview(visualEffectView)
+        drawerVisualEffectView = visualEffectView
 
         // Set clipping container as window content
         clipboardWindow.contentView = clippingContainer
@@ -359,35 +362,40 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Prepare view for display (select first item)
         clipboardViewModel.prepareForDisplay()
 
-        isShowingWindow = true
+        drawerAnimationGeneration += 1
+        let animationGeneration = drawerAnimationGeneration
 
         // Use full screen frame for width, visibleFrame for height calculation
         let fullFrame = NSScreen.main?.frame ?? .zero
-        let visibleFrame = NSScreen.main?.visibleFrame ?? .zero
+        let screenVisibleFrame = NSScreen.main?.visibleFrame ?? .zero
         let drawerHeight: CGFloat = 280
 
         // Position window at visible area (stays in place)
         let windowRect = CGRect(
             x: fullFrame.origin.x,
-            y: visibleFrame.origin.y,
+            y: screenVisibleFrame.origin.y,
             width: fullFrame.width,
             height: drawerHeight
         )
         clipboardWindow.setFrame(windowRect, display: false)
 
-        // Get the visual effect view (first subview of clipping container)
-        guard let clippingContainer = clipboardWindow.contentView,
-              let visualEffectView = clippingContainer.subviews.first else {
+        guard let visualEffectView = drawerVisualEffectView else {
             return
         }
 
-        // Reset visual effect view to off-screen position (within container)
-        visualEffectView.frame = NSRect(
+        let motionStyle = MotionStyle.current()
+        let durationMultiplier = MotionSpeed.current().durationMultiplier
+        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        let visibleFrame = NSRect(x: 0, y: 0, width: fullFrame.width, height: drawerHeight)
+        let hiddenFrame = NSRect(
             x: 0,
-            y: -drawerHeight,
+            y: motionStyle == .softMaterial ? -40 : -drawerHeight,
             width: fullFrame.width,
             height: drawerHeight
         )
+
+        visualEffectView.frame = reduceMotion ? visibleFrame : hiddenFrame
+        visualEffectView.alphaValue = reduceMotion || motionStyle == .softMaterial ? 0 : 1
 
         // Show window and make it key (but don't activate app, preserving original app focus)
         // This allows clicks to work immediately without needing a first click to focus
@@ -418,24 +426,46 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        // Animate visual effect view sliding up within the clipping container
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.15
-            // Ultra snappy ease-out: instant start, smooth deceleration
-            // Similar to macOS system animations
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            context.allowsImplicitAnimation = true
+        // Let AppKit commit the hidden state before starting the entrance animation.
+        DispatchQueue.main.async { [weak self, weak visualEffectView] in
+            guard let self, let visualEffectView else { return }
+            guard self.drawerAnimationGeneration == animationGeneration,
+                  self.clipboardWindow.isVisible else { return }
 
-            // Slide to visible position (y: 0)
-            visualEffectView.animator().frame = NSRect(
-                x: 0,
-                y: 0,
-                width: fullFrame.width,
-                height: drawerHeight
-            )
-        }, completionHandler: { [weak self] in
-            self?.isShowingWindow = false
-        })
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = MotionTiming.drawerEnter * durationMultiplier
+                switch motionStyle {
+                case .nativeSnappy:
+                    context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                case .spatialSpring:
+                    context.timingFunction = CAMediaTimingFunction(
+                        controlPoints: 0.34, 1.0, 0.64, 1.0
+                    )
+                case .softMaterial:
+                    context.timingFunction = CAMediaTimingFunction(
+                        controlPoints: 0.215, 0.61, 0.355, 1.0
+                    )
+                }
+                if reduceMotion {
+                    context.duration = 0.05
+                    context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                }
+                context.allowsImplicitAnimation = true
+
+                if !reduceMotion {
+                    visualEffectView.animator().frame = visibleFrame
+                }
+                if reduceMotion || motionStyle == .softMaterial {
+                    visualEffectView.animator().alphaValue = 1
+                }
+            }, completionHandler: { [weak self] in
+                guard let self,
+                      self.drawerAnimationGeneration == animationGeneration else { return }
+
+                visualEffectView.frame = visibleFrame
+                visualEffectView.alphaValue = 1
+            })
+        }
     }
 
     private func hideClipboardWindow(completion: (() -> Void)? = nil) {
@@ -443,6 +473,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             completion?()
             return
         }
+
+        drawerAnimationGeneration += 1
+        let animationGeneration = drawerAnimationGeneration
 
         let restoreSettingsFocus = shouldRestoreSettingsFocusAfterDrawerClose()
 
@@ -461,9 +494,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         clipboardWindow.resignKey()
 
-        // Get the visual effect view
-        guard let clippingContainer = clipboardWindow.contentView,
-              let visualEffectView = clippingContainer.subviews.first else {
+        guard let visualEffectView = drawerVisualEffectView else {
             finishHidingClipboardWindow(
                 restoreSettingsFocus: restoreSettingsFocus,
                 completion: completion
@@ -471,27 +502,52 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        // Animate visual effect view sliding down
+        let motionStyle = MotionStyle.current()
+        let durationMultiplier = MotionSpeed.current().durationMultiplier
+        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        let visibleFrame = NSRect(x: 0, y: 0, width: fullFrame.width, height: drawerHeight)
+        let hiddenFrame = NSRect(
+            x: 0,
+            y: motionStyle == .softMaterial ? -20 : -drawerHeight,
+            width: fullFrame.width,
+            height: drawerHeight
+        )
+
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.12
-            // Quick ease-in: instant start, accelerate to finish
-            // Similar to macOS dismiss animations
-            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            context.duration = MotionTiming.drawerExit * durationMultiplier
+            switch motionStyle {
+            case .nativeSnappy:
+                context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            case .spatialSpring:
+                context.timingFunction = CAMediaTimingFunction(
+                    controlPoints: 0.36, 0.0, 0.66, 1.0
+                )
+            case .softMaterial:
+                context.timingFunction = CAMediaTimingFunction(
+                    controlPoints: 0.55, 0.055, 0.675, 0.19
+                )
+            }
+            if reduceMotion {
+                context.duration = 0.05
+                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            }
             context.allowsImplicitAnimation = true
 
-            // Slide to off-screen position (y: -drawerHeight)
-            visualEffectView.animator().frame = NSRect(
-                x: 0,
-                y: -drawerHeight,
-                width: fullFrame.width,
-                height: drawerHeight
-            )
+            if !reduceMotion {
+                visualEffectView.animator().frame = hiddenFrame
+            }
+            if reduceMotion || motionStyle == .softMaterial {
+                visualEffectView.animator().alphaValue = 0
+            }
         }, completionHandler: { [weak self] in
-            guard let self = self else { return }
+            guard let self,
+                  self.drawerAnimationGeneration == animationGeneration else { return }
             self.finishHidingClipboardWindow(
                 restoreSettingsFocus: restoreSettingsFocus,
                 completion: completion
             )
+            visualEffectView.frame = visibleFrame
+            visualEffectView.alphaValue = 1
         })
     }
 
