@@ -109,14 +109,11 @@ PasteDeck/
 
 ## 发布方式
 
-推送语义化版本标签会触发 GitHub Actions：
+发布由 [Conventional Commits](https://www.conventionalcommits.org/) 驱动。推送到 `main` 且存在可发布变更时，release-please 会根据提交类型生成或更新一个 Release PR，其中包含版本号、`CHANGELOG.md` 和 `VERSION` 文件的更新。
 
-```bash
-git tag v1.2.3
-git push origin v1.2.3
-```
+合并 Release PR 后，release-please 会创建对应的 `vX.Y.Z` 标签和 GitHub Release，并在同一次工作流运行中构建 `arm64 + x86_64` universal app、执行 ad-hoc 签名与结构验证，然后上传 DMG、ZIP 和各自的 SHA-256 文件。release-please 任务需要 `contents`、`issues`、`pull-requests` 的写权限来创建 Release PR，构建任务只需 `contents: write`。仓库需在 Settings → Actions → General 中允许 GitHub Actions 创建 Pull Request（一次性前置条件）。整个过程只使用仓库内置的 `GITHUB_TOKEN`，不需要任何 PAT、Secrets 或 Apple 凭据。
 
-Release 工作流会运行测试、构建 `arm64 + x86_64` universal app、执行 ad-hoc 签名与结构验证，并发布 DMG、ZIP 和各自的 SHA-256 文件。整个过程只使用仓库内置的 `GITHUB_TOKEN`，不需要任何 Apple 凭据。
+如需重跑已存在标签的发布，可在 Actions 页面手动运行 Release 工作流并输入该标签；这是恢复手段，不是常规发布路径。
 
 详细说明见 [分发指南](Docs/Development/DISTRIBUTION.md)。
 

@@ -109,14 +109,11 @@ PasteDeck/
 
 ## Releases
 
-Pushing a semantic version tag triggers GitHub Actions:
+Releases are driven by [Conventional Commits](https://www.conventionalcommits.org/). When a push to `main` contains releasable changes, release-please generates or updates a Release PR that bumps the version and updates `CHANGELOG.md` and the `VERSION` file.
 
-```bash
-git tag v1.2.3
-git push origin v1.2.3
-```
+Merging the Release PR creates the `vX.Y.Z` tag and GitHub Release, and the same workflow run builds an `arm64 + x86_64` universal app, performs ad-hoc signing and structural validation, and uploads DMG, ZIP, and SHA-256 files. The release-please job needs `contents`, `issues`, and `pull-requests` write to create the Release PR; the build job only needs `contents: write`. As a one-time prerequisite, the repository must allow GitHub Actions to create pull requests (Settings → Actions → General). The entire process only uses the repository-provided `GITHUB_TOKEN` and requires no PAT, Secrets, or Apple credentials.
 
-The Release workflow runs the test suite, builds an `arm64 + x86_64` universal app, performs ad-hoc signing and structural validation, and publishes DMG, ZIP, and SHA-256 files. The entire process only uses the repository-provided `GITHUB_TOKEN` and requires no Apple credentials.
+To re-publish an existing tag, manually run the Release workflow from the Actions page and enter the tag. This is a recovery path, not the normal release flow.
 
 See the [distribution guide](Docs/Development/DISTRIBUTION.md) for details.
 
