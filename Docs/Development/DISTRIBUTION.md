@@ -26,29 +26,27 @@ CI 执行 `make test` 和 `make verify`。验证范围包括 Info.plist、主程
 
 ## 创建发布
 
+发布由 [Conventional Commits](https://www.conventionalcommits.org/) 驱动，无需手动创建或推送标签：
+
 1. 确保 `main` 上的 CI 已通过。
-2. 创建符合 `vX.Y.Z` 形式的标签。
-3. 推送标签。
+2. 使用 Conventional Commits 规范提交变更（`fix` 触发 patch、`feat` 触发 minor、`BREAKING CHANGE` 触发 major）。
+3. 推送到 `main`。存在可发布变更时，release-please 会生成或更新一个 Release PR，其中包含版本号、`CHANGELOG.md` 和 `VERSION` 文件的更新。
+4. 合并 Release PR。release-please 会创建对应的 `vX.Y.Z` 标签和 GitHub Release。
 
-```bash
-git tag v1.2.3
-git push origin v1.2.3
-```
+`.github/workflows/release.yml` 在 `release_created` 后于同一次运行中自动：
 
-`.github/workflows/release.yml` 会自动：
-
-1. 校验标签并从中提取版本号。
-2. 检出该标签，而不是分支最新提交。
+1. 从 release-please 输出解析版本号。
+2. 检出该版本对应的提交。
 3. 运行完整测试。
 4. 以 `arm64 x86_64` 架构构建 universal app。
 5. 对嵌套 bundle 和外层 app 进行 ad-hoc 签名。
 6. 验证 bundle、签名和架构。
 7. 使用 macOS 自带的 `ditto` 与 `hdiutil` 生成 ZIP 和 DMG。
-8. 生成 SHA-256 文件并创建 GitHub Release。
+8. 生成 SHA-256 文件并上传到已创建的 GitHub Release。
 
-发布任务仅申请 `contents: write` 权限，通过 GitHub 自动提供、且仅限当前仓库的 `GITHUB_TOKEN` 创建 Release。无需配置 Secrets。
+release-please 任务申请 `contents`、`issues`、`pull-requests` 的写权限以创建 Release PR；构建任务仅申请 `contents: write` 权限。两者都通过 GitHub 自动提供、且仅限当前仓库的 `GITHUB_TOKEN` 工作。作为一次性前置条件，仓库需在 Settings → Actions → General 中允许 GitHub Actions 创建 Pull Request。无需配置 Secrets，也不需要 PAT 或 Apple 凭据。
 
-如需重跑已存在标签的发布，可在 Actions 页面手动运行 Release 工作流并输入标签。已存在的 Release 会覆盖同名构建产物，不会创建重复 Release。
+如需重跑已存在标签的发布，可在 Actions 页面手动运行 Release 工作流并输入标签。已存在的 Release 会覆盖同名构建产物，不会创建重复 Release。这是恢复手段，不是常规发布路径。
 
 ## 本地复现
 
