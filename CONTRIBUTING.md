@@ -289,13 +289,15 @@ class ClipboardMonitor: ObservableObject {
 
 ## Release Process
 
-1. Update version number in Xcode project
-2. Update CHANGELOG.md
-3. Create a release branch
-4. Run all tests
-5. Build release version
-6. Create GitHub release with release notes
-7. Submit to Mac App Store (if applicable)
+Releases are driven by [Conventional Commits](https://www.conventionalcommits.org/) and handled by release-please. You do not create tags or releases by hand.
+
+- `fix` commits bump the patch version.
+- `feat` commits bump the minor version.
+- A `BREAKING CHANGE` footer (or `!` after the type) bumps the major version.
+
+When a push to `main` contains releasable changes, release-please generates or updates a Release PR that bumps the version and updates `CHANGELOG.md` and the `VERSION` file. Merging that PR creates the `vX.Y.Z` tag and GitHub Release, and the same workflow run builds and uploads the DMG, ZIP, and SHA-256 files. `VERSION` and `CHANGELOG.md` are maintained by release-please, not edited by hand.
+
+The release-please job needs `contents`, `issues`, and `pull-requests` write to create the Release PR; the build job only needs `contents: write`. As a one-time prerequisite, the repository must allow GitHub Actions to create pull requests (Settings → Actions → General). The workflow only uses the repository-provided `GITHUB_TOKEN`; no PAT, Secrets, or Apple credentials are required. To re-publish an existing tag, manually run the Release workflow from the Actions page and enter the tag. This is a recovery path, not the normal release flow.
 
 ## Getting Help
 
