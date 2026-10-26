@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/jeffusion/PasteDeck/compare/v1.1.0...v1.1.1) (2026-10-26)
+
+
+### Bug Fixes
+
+* **history:** repair duplicate identities and prevent concurrent writes ([aac633c](https://github.com/jeffusion/PasteDeck/commit/aac633c3566ff38f2565e0774f35a392868dfa83))
+
 ## [1.1.0](https://github.com/jeffusion/PasteDeck/compare/v1.0.0...v1.1.0) (2026-08-31)
 
 
