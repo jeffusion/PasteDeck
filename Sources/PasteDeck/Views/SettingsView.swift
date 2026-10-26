@@ -1017,7 +1017,7 @@ private struct SettingsRowDivider: View {
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
         SettingsView()
-            .environmentObject(ClipboardViewModel(monitor: ClipboardMonitor()))
+            .environmentObject(ClipboardViewModel(monitor: ClipboardMonitor(), storageService: StorageService(persistenceController: PersistenceController(inMemory: true)), pasteboard: .withUniqueName()))
     }
 }
 #endif

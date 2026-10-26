@@ -9,10 +9,20 @@ APP_BINARY="$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 BUNDLE_ID="com.pastedeck.app"
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
+for _ in {1..50}; do
+    if ! pgrep -x "$APP_NAME" >/dev/null 2>&1; then
+        break
+    fi
+    sleep 0.1
+done
+if pgrep -x "$APP_NAME" >/dev/null 2>&1; then
+    echo "PasteDeck did not exit within 5 seconds" >&2
+    exit 1
+fi
 CONFIGURATION=debug make -C "$ROOT_DIR" app
 
 open_app() {
-    /usr/bin/open -n "$APP_BUNDLE"
+    /usr/bin/open "$APP_BUNDLE"
 }
 
 case "$MODE" in

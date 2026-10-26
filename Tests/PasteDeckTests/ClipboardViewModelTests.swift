@@ -23,7 +23,7 @@ final class ClipboardViewModelTests: XCTestCase {
         // Use in-memory storage for test isolation
         let persistenceController = PersistenceController(inMemory: true)
         storageService = StorageService(persistenceController: persistenceController)
-        viewModel = ClipboardViewModel(monitor: monitor, storageService: storageService, maxHistorySize: 10)
+        viewModel = ClipboardViewModel(monitor: monitor, storageService: storageService, maxHistorySize: 10, pasteboard: .withUniqueName())
         cancellables = Set<AnyCancellable>()
     }
 

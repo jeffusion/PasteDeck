@@ -9,6 +9,7 @@
 import XCTest
 @testable import PasteDeck
 
+@MainActor
 final class StorageServiceTests: XCTestCase {
     var storageService: StorageService!
     var persistenceController: PersistenceController!

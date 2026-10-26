@@ -16,6 +16,8 @@ class ClipboardViewModel: ObservableObject {
     // MARK: - Published Properties
 
     @Published var items: [ClipItem] = []
+    @Published private(set) var isStorageReady = false
+    @Published private(set) var storageError: String?
     @Published var filteredItems: [ClipItem] = []
     @Published var searchText: String = ""
     @Published var contentFilter: ClipItem.ContentFilter = .all
@@ -34,6 +36,7 @@ class ClipboardViewModel: ObservableObject {
 
     // MARK: - Private Properties
 
+    private let pasteboard: NSPasteboard
     private let monitor: ClipboardMonitor
     private let storageService: StorageService
     private var cancellables = Set<AnyCancellable>()
@@ -45,9 +48,10 @@ class ClipboardViewModel: ObservableObject {
 
     // MARK: - Initialization
 
-    init(monitor: ClipboardMonitor, storageService: StorageService = StorageService(), maxHistorySize: Int? = nil) {
+    init(monitor: ClipboardMonitor, storageService: StorageService? = nil, maxHistorySize: Int? = nil, pasteboard: NSPasteboard = .general) {
+        self.pasteboard = pasteboard
         self.monitor = monitor
-        self.storageService = storageService
+        self.storageService = storageService ?? StorageService()
         self.maxHistorySize = maxHistorySize ?? defaultMaxHistorySize
 
         setupSubscriptions()
@@ -84,32 +88,38 @@ class ClipboardViewModel: ObservableObject {
     }
 
     private func loadInitialData() {
-        _ = storageService.enforceMaxHistory(maxItems: maxHistorySize)
-
-        // Load persisted data from Core Data
-        items = storageService.fetchAll()
-        applyFilters()
-        print("📋 ClipboardViewModel: Loaded \(items.count) items from storage")
+        do {
+            let loaded = try storageService.loadHistory(maxItems: maxHistorySize)
+            items = loaded
+            storageError = nil
+            isStorageReady = true
+            applyFilters()
+        } catch {
+            isStorageReady = false
+            storageError = L10n.string("storage.error.load")
+        }
     }
+
+    func retryLoadingHistory() { loadInitialData() }
+    func dismissStorageError() { storageError = nil }
+    func suspendForStorageFailure() { isStorageReady = false }
 
     // MARK: - Public Methods
 
     /// Copy an item to the clipboard and mark as used
     func copyItem(_ item: ClipItem) {
-        // Write to pasteboard
-        item.content.write(to: .general)
-
-        // Update use statistics
-        if let index = items.firstIndex(where: { $0.id == item.id }) {
-            items[index].markAsUsed()
-            saveItems()
+        guard isStorageReady else { return }
+        item.content.write(to: pasteboard)
+        var candidate = items
+        if let index = candidate.firstIndex(where: { $0.id == item.id }) {
+            candidate[index].markAsUsed()
+            _ = persist(candidate)
         }
-
-        print("📋 Copied: \(item.title)")
     }
 
     /// Copy and paste an item (copy then simulate paste)
     func copyAndPaste(_ item: ClipItem) {
+        guard isStorageReady else { return }
         // 1. Always copy to clipboard first
         copyItem(item)
 
@@ -149,95 +159,59 @@ class ClipboardViewModel: ObservableObject {
         }
     }
 
-    /// Toggle favorite status
+    /// Publish history changes only after the complete transaction succeeds.
     func toggleFavorite(_ item: ClipItem) {
-        if let index = items.firstIndex(where: { $0.id == item.id }) {
-            items[index].toggleFavorite()
-            saveItems()
-            applyFilters()
-        }
+        var candidate = items
+        guard let index = candidate.firstIndex(where: { $0.id == item.id }) else { return }
+        candidate[index].toggleFavorite()
+        _ = persist(candidate)
     }
 
-    /// Toggle pinned status
     func togglePin(_ item: ClipItem) {
-        if let index = items.firstIndex(where: { $0.id == item.id }) {
-            items[index].togglePinned()
-            saveItems()
-            applyFilters()
+        var candidate = items
+        guard let index = candidate.firstIndex(where: { $0.id == item.id }) else { return }
+        candidate[index].togglePinned()
+        _ = persist(candidate)
+    }
+
+    func deleteItem(_ item: ClipItem) { deleteItems([item]) }
+
+    func deleteItems(_ itemsToDelete: [ClipItem]) {
+        let ids = Set(itemsToDelete.map(\.id))
+        if persist(items.filter { !ids.contains($0.id) }) {
+            SoundManager.shared.playSound(for: .deleted)
         }
     }
 
-    /// Delete an item
-    func deleteItem(_ item: ClipItem) {
-        items.removeAll { $0.id == item.id }
-        saveItems()
-        applyFilters()
-
-        // Play sound effect for deletion
-        SoundManager.shared.playSound(for: .deleted)
-    }
-
-    /// Delete multiple items
-    func deleteItems(_ itemsToDelete: [ClipItem]) {
-        let idsToDelete = Set(itemsToDelete.map { $0.id })
-        items.removeAll { idsToDelete.contains($0.id) }
-        saveItems()
-        applyFilters()
-
-        // Play sound effect for deletion
-        SoundManager.shared.playSound(for: .deleted)
-    }
-
-    /// Clear all non-permanent items
     func clearHistory() {
-        items.removeAll { !$0.isPermanent }
-        saveItems()
-        applyFilters()
-
-        // Play sound effect for clearing history
-        SoundManager.shared.playSound(for: .cleared)
+        if persist(items.filter(\.isPermanent)) { SoundManager.shared.playSound(for: .cleared) }
     }
 
-    /// Clear all items including favorites
     func clearAll() {
-        items.removeAll()
-        saveItems()
-        applyFilters()
-
-        // Play sound effect for clearing all
-        SoundManager.shared.playSound(for: .cleared)
+        if persist([]) { SoundManager.shared.playSound(for: .cleared) }
     }
 
-    /// Clean up items older than specified retention days
-    /// - Parameter retentionDays: Number of days to retain (-1 means keep forever)
-    /// - Returns: Number of items deleted
     @discardableResult
     func cleanupExpiredItems(retentionDays: Int) -> Int {
-        // Delete from database first
-        let deletedCount = storageService.deleteItemsOlderThan(days: retentionDays, keepPermanent: true)
-
-        // Reload items from storage to sync with database
-        items = storageService.fetchAll()
-        applyFilters()
-
-        print("📋 ClipboardViewModel: Cleaned up \(deletedCount) expired items (retention: \(retentionDays) days)")
-        return deletedCount
+        guard retentionDays > 0,
+              let cutoff = Calendar.current.date(byAdding: .day, value: -retentionDays, to: Date()) else { return 0 }
+        let candidate = items.filter { $0.isPermanent || $0.createdAt >= cutoff }
+        let deleted = items.count - candidate.count
+        return persist(candidate) ? deleted : 0
     }
 
-    /// Add a tag to an item
     func addTag(_ tag: String, to item: ClipItem) {
-        if let index = items.firstIndex(where: { $0.id == item.id }) {
-            items[index].addTag(tag)
-            saveItems()
-        }
+        var candidate = items
+        guard let index = candidate.firstIndex(where: { $0.id == item.id }) else { return }
+        candidate[index].addTag(tag)
+        _ = persist(candidate)
     }
 
-    /// Remove a tag from an item
     func removeTag(_ tag: String, from item: ClipItem) {
-        if let index = items.firstIndex(where: { $0.id == item.id }) {
-            items[index].removeTag(tag)
-            saveItems()
-        }
+        var candidate = items
+        guard let index = candidate.firstIndex(where: { $0.id == item.id }) else { return }
+        candidate[index].removeTag(tag)
+        _ = persist(candidate)
     }
 
     /// Reset UI-related state to initial values
@@ -260,23 +234,16 @@ class ClipboardViewModel: ObservableObject {
     // MARK: - Private Methods
 
     private func handleNewClipItem(_ clipItem: ClipItem) {
-        // Check for duplicates (same content)
-        if let existingIndex = items.firstIndex(where: { self.isSimilarContent($0.content, clipItem.content) }) {
-            // Move existing item to top by updating its date
-            var existing = items[existingIndex]
+        guard isStorageReady else { return }
+        var candidate = items
+        if let existingIndex = candidate.firstIndex(where: { self.isSimilarContent($0.content, clipItem.content) }) {
+            var existing = candidate.remove(at: existingIndex)
             existing.markAsUsed()
-            items.remove(at: existingIndex)
-            items.insert(existing, at: 0)
+            candidate.insert(existing, at: 0)
         } else {
-            // Add new item
-            items.insert(clipItem, at: 0)
+            candidate.insert(clipItem, at: 0)
         }
-
-        saveItems()
-        applyFilters()
-
-        // Play sound effect for new clipboard capture
-        SoundManager.shared.playSound(for: .captured)
+        if persist(candidate) { SoundManager.shared.playSound(for: .captured) }
     }
 
     private func isSimilarContent(_ content1: ClipContent, _ content2: ClipContent) -> Bool {
@@ -321,15 +288,18 @@ class ClipboardViewModel: ObservableObject {
         filteredItems = filtered
     }
 
-    private func saveItems() {
-        // Persist all items to Core Data
-        // First, clear and re-save (simple approach for now)
-        _ = storageService.deleteAll(keepFavorites: false)
-        _ = storageService.save(items)
-
-        // Enforce max history
-        if storageService.enforceMaxHistory(maxItems: maxHistorySize) > 0 {
-            items = storageService.fetchAll()
+    @discardableResult
+    private func persist(_ candidate: [ClipItem]) -> Bool {
+        guard isStorageReady else { return false }
+        do {
+            let saved = try storageService.replaceAll(with: candidate, maxItems: maxHistorySize)
+            items = saved
+            storageError = nil
+            applyFilters()
+            return true
+        } catch {
+            storageError = L10n.string("storage.error.save")
+            return false
         }
     }
 
@@ -419,7 +389,7 @@ class ClipboardViewModel: ObservableObject {
 extension ClipboardViewModel {
     static var preview: ClipboardViewModel {
         let monitor = ClipboardMonitor()
-        let viewModel = ClipboardViewModel(monitor: monitor)
+        let viewModel = ClipboardViewModel(monitor: monitor, storageService: StorageService(persistenceController: PersistenceController(inMemory: true)), pasteboard: .withUniqueName())
 
         // Add sample data
         viewModel.items = [

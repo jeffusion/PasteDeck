@@ -88,6 +88,14 @@
 "settings.history.clear.confirm" = "Очистить историю";
 "settings.error.title" = "Не удалось изменить настройку";
 "settings.error.launch_at_login" = "Не удалось изменить настройку «Открывать при входе». Проверьте разрешения в Системных настройках.";
+"storage.error.title" = "Ошибка хранилища истории";
+"storage.error.load" = "PasteDeck не удалось загрузить историю буфера обмена. Повторите попытку или завершите PasteDeck и попробуйте снова.";
+"storage.error.save" = "PasteDeck не удалось сохранить последнее изменение истории буфера обмена. История, показанная в этом окне, останется доступной.";
+"storage.error.retry" = "Повторить";
+"storage.error.quit" = "Завершить PasteDeck";
+"singleinstance.error.title" = "Требуется один экземпляр";
+"singleinstance.error.lock" = "PasteDeck не удалось получить исключительный доступ к базе данных истории и приложение будет закрыто. Проверьте права доступа к папке Application Support/PasteDeck и повторите попытку.";
+"singleinstance.error.oldversion" = "Другой процесс PasteDeck всё ещё работает. Завершите его и запустите PasteDeck снова, чтобы защитить историю.";
 "settings.retention.shorten.title" = "Сократить срок хранения";
 "settings.retention.shorten.message" = "При сокращении срока хранения история старше %@ будет удалена немедленно, кроме избранных и закреплённых элементов. Это действие нельзя отменить.";
 "settings.retention.confirm_delete" = "Удалить сейчас";

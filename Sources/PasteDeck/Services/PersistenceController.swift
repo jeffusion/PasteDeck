@@ -49,6 +49,12 @@ class PersistenceController {
 
     let container: NSPersistentContainer
     let inMemory: Bool
+    private(set) var loadError: Error?
+
+    static var applicationDirectory: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("PasteDeck", isDirectory: true)
+    }
 
     /// Main view context for UI operations
     var viewContext: NSManagedObjectContext {
@@ -62,7 +68,7 @@ class PersistenceController {
 
     // MARK: - Initialization
 
-    init(inMemory: Bool = false) {
+    init(inMemory: Bool = false, storeURL: URL? = nil, readOnly: Bool = false) {
         self.inMemory = inMemory
 
         // Create the managed object model programmatically
@@ -78,8 +84,21 @@ class PersistenceController {
             container.persistentStoreDescriptions = [description]
         } else {
             // Set up store URL in Application Support
-            let storeURL = Self.storeURL()
-            container.persistentStoreDescriptions.first?.url = storeURL
+            let location = storeURL ?? Self.applicationDirectory.appendingPathComponent("PasteDeck.sqlite")
+            container.persistentStoreDescriptions.first?.url = location
+            do {
+                if !readOnly {
+                    try FileManager.default.createDirectory(at: location.deletingLastPathComponent(), withIntermediateDirectories: true)
+                }
+            } catch {
+                loadError = error
+            }
+            container.persistentStoreDescriptions.first?.url = location
+        }
+
+        container.persistentStoreDescriptions.first?.shouldAddStoreAsynchronously = false
+        if readOnly {
+            container.persistentStoreDescriptions.first?.setOption(true as NSNumber, forKey: NSReadOnlyPersistentStoreOption)
         }
 
         // Configure container
@@ -93,18 +112,31 @@ class PersistenceController {
         )
 
         // Load persistent stores
-        container.loadPersistentStores { storeDescription, error in
-            if let error = error as NSError? {
-                // In production, handle this error appropriately
-                fatalError("Failed to load persistent stores: \(error), \(error.userInfo)")
-            }
-            print("📦 Core Data store loaded: \(storeDescription.url?.absoluteString ?? "unknown")")
+        if loadError == nil {
+            container.loadPersistentStores { [weak self] _, error in self?.loadError = error }
         }
 
         // Configure view context
         container.viewContext.automaticallyMergesChangesFromParent = true
         container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
         container.viewContext.name = "viewContext"
+    }
+
+    /// Allows a startup Retry after a transient filesystem or store-opening failure.
+    func retryLoadingStoreIfNeeded() throws {
+        guard container.persistentStoreCoordinator.persistentStores.isEmpty else {
+            if let loadError { throw loadError }
+            return
+        }
+        if let description = container.persistentStoreDescriptions.first,
+           let url = description.url,
+           (description.options[NSReadOnlyPersistentStoreOption] as? NSNumber)?.boolValue != true,
+           !inMemory {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        }
+        loadError = nil
+        container.loadPersistentStores { [weak self] _, error in self?.loadError = error }
+        if let loadError { throw loadError }
     }
 
     // MARK: - Model Creation
@@ -278,15 +310,27 @@ class PersistenceController {
 
     // MARK: - Store Location
 
-    /// Returns the URL for the Core Data store
-    private static func storeURL() -> URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let directory = appSupport.appendingPathComponent("PasteDeck", isDirectory: true)
-
-        // Create directory if it doesn't exist
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-
-        return directory.appendingPathComponent("PasteDeck.sqlite")
+    /// Core Data copies the SQLite store together with its external binary data.
+    /// Call before changing any records, with the application's instance lock held.
+    func backupStore() throws -> URL? {
+        if let loadError { throw loadError }
+        guard !inMemory, let source = container.persistentStoreDescriptions.first?.url else { return nil }
+        let directory = source.deletingLastPathComponent()
+            .appendingPathComponent("Backups", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
+                                              attributes: [.posixPermissions: 0o700])
+        let destination = directory.appendingPathComponent("PasteDeck.sqlite")
+        do {
+            try container.persistentStoreCoordinator.replacePersistentStore(
+                at: destination, destinationOptions: nil,
+                withPersistentStoreFrom: source, sourceOptions: nil, ofType: NSSQLiteStoreType
+            )
+            return destination
+        } catch {
+            try? FileManager.default.removeItem(at: directory)
+            throw error
+        }
     }
 
     // MARK: - Save Operations

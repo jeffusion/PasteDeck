@@ -88,6 +88,14 @@
 "settings.history.clear.confirm" = "清除历史";
 "settings.error.title" = "设置失败";
 "settings.error.launch_at_login" = "无法更改“登录时打开”设置，请检查系统设置中的权限。";
+"storage.error.title" = "历史记录存储错误";
+"storage.error.load" = "PasteDeck 无法加载剪贴板历史。请重试，或退出 PasteDeck 后再试。";
+"storage.error.save" = "PasteDeck 无法保存最新的剪贴板历史更改。当前窗口显示的历史仍可使用。";
+"storage.error.retry" = "重试";
+"storage.error.quit" = "退出 PasteDeck";
+"singleinstance.error.title" = "需要单实例运行";
+"singleinstance.error.lock" = "PasteDeck 无法取得历史数据库的独占访问权限，即将退出。请检查 PasteDeck Application Support 文件夹的权限后再试。";
+"singleinstance.error.oldversion" = "另一个 PasteDeck 进程仍在运行。请先退出该进程，再重新启动 PasteDeck，以保护剪贴板历史。";
 "settings.retention.shorten.title" = "缩短保留时间";
 "settings.retention.shorten.message" = "缩短保留时间会立即删除早于%@的历史记录，但不会删除收藏和置顶项目。此操作无法撤销。";
 "settings.retention.confirm_delete" = "立即删除";

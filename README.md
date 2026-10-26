@@ -61,6 +61,9 @@ shasum -a 256 -c PasteDeck-x.y.z.dmg.sha256
 - PasteDeck 不包含遥测，也不会将剪贴板内容上传到服务器。
 - 当前版本不提供 iCloud 同步。
 - 本地数据库没有额外加密；能够访问当前 macOS 用户数据的人也可能读取该数据库。
+- 启动时自动检查重复记录 ID。同 ID、同内容的副本会合并，保留收藏、置顶、标签和备注；内容冲突的记录分配独立 ID 后保留。
+- 修复前会在 `~/Library/Application Support/PasteDeck/Backups/` 创建完整备份。备份同样包含剪贴板历史，请按本地敏感数据保管。
+- 同一历史库只允许一个 PasteDeck 实例写入；再次启动会唤起已有实例。
 
 ## 系统要求
 

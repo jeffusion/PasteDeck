@@ -61,6 +61,9 @@ shasum -a 256 -c PasteDeck-x.y.z.dmg.sha256
 - PasteDeck contains no telemetry and does not upload clipboard content to a server.
 - The current release does not support iCloud sync.
 - The local database has no additional encryption. Anyone who can access the current macOS user's data may also be able to read it.
+- Startup checks for duplicate record IDs. Copies with the same ID and content are merged while preserving favorites, pins, tags, and notes; conflicting content is retained with separate IDs.
+- Before repairing history, PasteDeck creates a complete backup under `~/Library/Application Support/PasteDeck/Backups/`. Backups also contain clipboard history and should be treated as sensitive local data.
+- Only one PasteDeck instance may write to a history database. Launching another copy brings the existing instance forward.
 
 ## Requirements
 

@@ -27,6 +27,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var globalMouseEventMonitor: Any?
     private var settingsWindow: NSWindow?
     private weak var drawerVisualEffectView: NSVisualEffectView?
+    private var singleInstanceGuard: SingleInstanceGuard?
+    private var isApplicationReady = false
+    private var hasPendingWakeRequest = false
+    private var isShowingStorageAlert = false
+
+    private static let bundleIdentifier = "com.pastedeck.app"
+    private static let wakeNotificationName = "com.pastedeck.wakeDrawer"
 
     private var isUITesting: Bool {
         ProcessInfo.processInfo.arguments.contains("--ui-testing")
@@ -47,22 +54,60 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Configure app to be menu bar only
         NSApp.setActivationPolicy(.accessory)
 
-        // Initialize services
+        if isUITesting {
+            setupClipboardMonitor()
+            setupViewModel(storageService: makeUITestingStorageService())
+            setupStatusBar()
+            setupClipboardWindow()
+            setupKeyboardShortcuts()
+            setupNotifications()
+            handleUITestingLaunchArguments()
+            observeRuntimeStorageErrors()
+            completeStartupAfterStorageReady()
+            print("🚀 PasteDeck launched in UI testing mode")
+            return
+        }
+
+        // The observer must exist before another instance can discover this PID.
+        setupSingleInstanceWakeObserver()
+
+        // No default on-disk Core Data store may be initialized before this lock is held.
+        do {
+            let instanceGuard = SingleInstanceGuard(
+                directoryURL: PersistenceController.applicationDirectory
+            )
+            guard try instanceGuard.acquire() else {
+                requestExistingInstancesToWake(ownerPID: instanceGuard.ownerPID)
+                quitApplication()
+                return
+            }
+            singleInstanceGuard = instanceGuard
+
+            // An older PasteDeck build may not know about the lock. Never touch its database.
+            if !SingleInstanceGuard.waitForOtherInstancesToExit(otherInstancesPresent: {
+                !self.otherPasteDeckApplications.isEmpty
+            }) {
+                showInstanceError(message: L10n.string("singleinstance.error.oldversion"))
+                quitApplication()
+                return
+            }
+        } catch {
+            print("🔒 Single-instance lock acquisition failed")
+            showInstanceError(message: L10n.string("singleinstance.error.lock"))
+            quitApplication()
+            return
+        }
+
+        // The monitor is created here but remains stopped until storage repair,
+        // loading, and startup retention cleanup have completed synchronously.
         setupClipboardMonitor()
-        setupViewModel()
+        setupViewModel(storageService: StorageService())
         setupStatusBar()
         setupClipboardWindow()
         setupKeyboardShortcuts()
         setupNotifications()
-        handleUITestingLaunchArguments()
-        if !isUITesting {
-            setupLaunchAtLogin()
-        }
-
-        // Perform startup cleanup based on retention settings
-        if !isUITesting {
-            performStartupCleanup()
-        }
+        observeRuntimeStorageErrors()
+        completeStartupAfterStorageReady()
 
         print("🚀 PasteDeck launched successfully")
     }
@@ -123,6 +168,143 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
+    private func setupSingleInstanceWakeObserver() {
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(handleSingleInstanceWakeRequest(_:)),
+            name: Notification.Name(Self.wakeNotificationName),
+            object: String(ProcessInfo.processInfo.processIdentifier)
+        )
+    }
+
+    @objc private func handleSingleInstanceWakeRequest(_ notification: Notification) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            guard self.isApplicationReady else {
+                self.hasPendingWakeRequest = true
+                return
+            }
+            if let currentApplication = NSRunningApplication(
+                processIdentifier: ProcessInfo.processInfo.processIdentifier
+            ) {
+                _ = currentApplication.activate(options: [.activateIgnoringOtherApps])
+            }
+            self.showClipboardWindow()
+        }
+    }
+
+    private var otherPasteDeckApplications: [NSRunningApplication] {
+        NSWorkspace.shared.runningApplications.filter {
+            $0.bundleIdentifier == Self.bundleIdentifier &&
+            $0.processIdentifier != ProcessInfo.processInfo.processIdentifier
+        }
+    }
+
+    private func requestExistingInstancesToWake(ownerPID: pid_t?) {
+        guard let ownerPID, ownerPID > 0, ownerPID != ProcessInfo.processInfo.processIdentifier else {
+            showInstanceError(message: L10n.string("singleinstance.error.lock"))
+            return
+        }
+        // The owner registered its observer before acquiring the lock. Do not
+        // require Launch Services to have finished registering its application.
+        _ = NSRunningApplication(processIdentifier: ownerPID)?.activate(options: [.activateIgnoringOtherApps])
+        DistributedNotificationCenter.default().postNotificationName(
+            Notification.Name(Self.wakeNotificationName), object: String(ownerPID),
+            userInfo: nil, deliverImmediately: true
+        )
+    }
+
+    private func quitApplication() {
+        NSApp.terminate(nil)
+    }
+
+    private func showInstanceError(message: String) {
+        let alert = NSAlert()
+        alert.messageText = L10n.string("singleinstance.error.title")
+        alert.informativeText = message
+        alert.addButton(withTitle: L10n.string("common.ok"))
+        NSApp.activate(ignoringOtherApps: true)
+        _ = alert.runModal()
+    }
+
+    private func observeRuntimeStorageErrors() {
+        clipboardViewModel.$storageError
+            .combineLatest(clipboardViewModel.$isStorageReady)
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] message, isReady in
+                guard let self, let message, isReady, self.isApplicationReady,
+                      self.clipboardViewModel.storageError == message else { return }
+                self.presentRuntimeStorageError(message)
+            }
+            .store(in: &cancellables)
+    }
+
+    private func completeStartupAfterStorageReady() {
+        guard clipboardViewModel.isStorageReady else {
+            presentStartupStorageErrorIfNeeded()
+            return
+        }
+
+        if !isUITesting && !performStartupCleanup() {
+            clipboardViewModel.suspendForStorageFailure()
+            presentStartupStorageErrorIfNeeded()
+            return
+        }
+        isApplicationReady = true
+
+        if !isUITesting {
+            setupLaunchAtLogin()
+            clipboardMonitor.startMonitoring()
+        }
+
+        flushPendingWakeRequest()
+    }
+
+    private func presentStartupStorageErrorIfNeeded() {
+        while !clipboardViewModel.isStorageReady {
+            let alert = NSAlert()
+            alert.messageText = L10n.string("storage.error.title")
+            alert.informativeText = clipboardViewModel.storageError ?? L10n.string("storage.error.load")
+            alert.addButton(withTitle: L10n.string("storage.error.retry"))
+            alert.addButton(withTitle: L10n.string("storage.error.quit"))
+            NSApp.activate(ignoringOtherApps: true)
+
+            switch alert.runModal() {
+            case .alertFirstButtonReturn:
+                clipboardViewModel.retryLoadingHistory()
+                if clipboardViewModel.isStorageReady {
+                    completeStartupAfterStorageReady()
+                    return
+                }
+            default:
+                quitApplication()
+                return
+            }
+        }
+    }
+
+    private func presentRuntimeStorageError(_ message: String) {
+        guard !isShowingStorageAlert else { return }
+        isShowingStorageAlert = true
+
+        let alert = NSAlert()
+        alert.messageText = L10n.string("storage.error.title")
+        alert.informativeText = message
+        alert.addButton(withTitle: L10n.string("common.ok"))
+        NSApp.activate(ignoringOtherApps: true)
+        _ = alert.runModal()
+
+        isShowingStorageAlert = false
+        clipboardViewModel.dismissStorageError()
+    }
+
+    private func flushPendingWakeRequest() {
+        guard hasPendingWakeRequest else { return }
+        hasPendingWakeRequest = false
+        showClipboardWindow()
+    }
+
     @objc private func userDefaultsDidChange() {
         // Update status bar visibility when showInMenuBar setting changes
         updateStatusBarVisibility()
@@ -134,43 +316,58 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         _ = LaunchAtLoginService.shared.sync(with: userPreference)
     }
 
-    private func performStartupCleanup() {
+    private func performStartupCleanup() -> Bool {
         // Read retention setting
         let retentionDays = UserDefaults.standard.integer(forKey: "historyRetentionDays")
 
         // Skip cleanup if set to permanent (-1) or invalid value
         guard retentionDays > 0 else {
             print("🧹 Startup cleanup skipped (retention: \(retentionDays == -1 ? "permanent" : "invalid"))")
-            return
+            return true
         }
 
-        // Perform cleanup in background
-        Task {
-            let deletedCount = clipboardViewModel.cleanupExpiredItems(retentionDays: retentionDays)
-            if deletedCount > 0 {
-                print("🧹 Startup cleanup: Deleted \(deletedCount) expired items (retention: \(retentionDays) days)")
-            } else {
-                print("🧹 Startup cleanup: No expired items to delete")
-            }
+        // This runs on the MainActor with StorageService, so monitor startup cannot
+        // race with the first complete retention transaction.
+        let deletedCount = clipboardViewModel.cleanupExpiredItems(retentionDays: retentionDays)
+        if deletedCount > 0 {
+            print("🧹 Startup cleanup: Deleted \(deletedCount) expired items (retention: \(retentionDays) days)")
+        } else {
+            print("🧹 Startup cleanup: No expired items to delete")
         }
+        return clipboardViewModel.storageError == nil
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if isApplicationReady { showClipboardWindow() } else { hasPendingWakeRequest = true }
+        return true
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        clipboardMonitor.stopMonitoring()
+        clipboardMonitor?.stopMonitoring()
         print("👋 PasteDeck terminated")
     }
 
     // MARK: - Setup Methods
 
     private func setupClipboardMonitor() {
-        clipboardMonitor = ClipboardMonitor()
-        if !isUITesting {
-            clipboardMonitor.startMonitoring()
-        }
+        clipboardMonitor = isUITesting
+            ? ClipboardMonitor(pasteboard: NSPasteboard.withUniqueName())
+            : ClipboardMonitor()
+        // Monitoring starts only after storage and startup retention are ready.
     }
 
-    private func setupViewModel() {
-        clipboardViewModel = ClipboardViewModel(monitor: clipboardMonitor)
+    private func makeUITestingStorageService() -> StorageService {
+        StorageService(
+            persistenceController: PersistenceController(inMemory: true)
+        )
+    }
+
+    private func setupViewModel(storageService: StorageService) {
+        clipboardViewModel = ClipboardViewModel(
+            monitor: clipboardMonitor,
+            storageService: storageService,
+            pasteboard: isUITesting ? .withUniqueName() : .general
+        )
     }
 
     private func setupStatusBar() {
@@ -338,7 +535,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
 
             let item = items[position - 1]
-            print("⚡ Quick paste: Position \(position) - \(item.title)")
+            print("⚡ Quick paste: Position \(position)")
             self.clipboardViewModel.copyAndPaste(item)
         }
 
@@ -354,6 +551,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func showClipboardWindow() {
+        guard let clipboardViewModel, clipboardViewModel.isStorageReady, clipboardWindow != nil else { return }
+
         guard !clipboardWindow.isVisible else {
             clipboardWindow.orderFront(nil)
             return

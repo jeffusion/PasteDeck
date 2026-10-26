@@ -88,6 +88,14 @@
 "settings.history.clear.confirm" = "Clear History";
 "settings.error.title" = "Settings Failed";
 "settings.error.launch_at_login" = "PasteDeck could not change the Open at Login setting. Check System Settings permissions.";
+"storage.error.title" = "History Storage Error";
+"storage.error.load" = "PasteDeck could not load its clipboard history. Choose Retry, or quit PasteDeck and try again.";
+"storage.error.save" = "PasteDeck could not save the latest clipboard history change. The history shown in this window is still available.";
+"storage.error.retry" = "Retry";
+"storage.error.quit" = "Quit PasteDeck";
+"singleinstance.error.title" = "Single Instance Required";
+"singleinstance.error.lock" = "PasteDeck could not secure exclusive access to its history database and will quit. Check permissions for the PasteDeck Application Support folder, then try again.";
+"singleinstance.error.oldversion" = "Another PasteDeck process is still running. Quit that process, then start PasteDeck again to protect your history.";
 "settings.retention.shorten.title" = "Shorten History Retention";
 "settings.retention.shorten.message" = "Shortening retention will immediately delete history older than %@, excluding favorites and pinned items. This action cannot be undone.";
 "settings.retention.confirm_delete" = "Delete Now";
